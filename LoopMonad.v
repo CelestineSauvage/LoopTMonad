@@ -1,4 +1,4 @@
-Require Import Arith.
+(* Require Import Arith. *)
 Require Import List.
 Require Import Program.
 
@@ -7,7 +7,7 @@ Module MonadLoop.
 Set Implicit Arguments.
 
 Import Notations.
-Import Arith.
+(* Import Arith. *)
 Import List.
 
 Local Notation "f ∘ g" := (fun x => f (g x)) (at level 40, left associativity).
@@ -177,6 +177,8 @@ Definition loopT_liftT {m} `{Monad m} {A} (x : m A) : LoopT m A :=
 Instance LoopT_T  : MonadTrans LoopT := 
 { liftT := @loopT_liftT}.
 
+
+
 End monadic_loop.
 
 Section monadic_state.
@@ -238,6 +240,8 @@ Definition i := 5.
 
 Definition init_S := {| myval := 5|}.
 
-Definition getinit_S : stateM nat:= pure i.
+Check State nat.
+
+Definition getinit_S : State nat.
 
 Compute runState init_S.
