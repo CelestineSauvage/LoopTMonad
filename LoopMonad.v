@@ -101,6 +101,18 @@ Notation "'do' a <- e ; c" := (e >>= (fun  a => c)) (at level 60, right associat
 End monadic_functions.
 
 Section monadic_loop.
+
+Unset Implicit Arguments.
+Set Maximal Implicit Insertion.
+Unset Strict Implicit.
+Unset Printing Implicit Defensive.
+
+Axiom Eta: forall A (B: A -> Type) (f: forall a, B a), f = fun  a=>f a.
+
+(* Generalizable All Variables.
+(* Unset Implicit Arguments. *) *)
+(* Set Maximal Implicit Insertion.
+Unset Strict Implicit. *)
 (*newtype LoopT c e m a = LoopT
     { runLoopT :: forall r.     -- This universal quantification forces the
                                 -- LoopT computation to call one of the
@@ -111,55 +123,78 @@ Section monadic_loop.
                -> m r
     } *)
 
-(* Variable R : Type. *)
+(* pas convaincue *)
+(* Variable r : Type. *)
 
-Inductive list (A : Type) :=| nil : list A| cons : A -> list A -> list A.
 
-Inductive option (A : Type) : Type :=Some : A -> option A | None : option A.
 
-(* Constructeur qui prend une valeur a (a -> m r) et renvoie le résultat dans la monade (m r) *)
-Inductive LoopT (m : Type -> Type) (A : Type) := 
-|C_LoopT : (forall R, (A -> m R) -> m R) -> LoopT m A.
-Check LoopT.
-Check C_LoopT.
+Inductive LoopT m c : Type
+  := MkLoopT : (forall {r : Type}, (c -> m r) -> m r) -> LoopT m c.
 
-Variable R : Type.
+Arguments MkLoopT {_} {_} _.
 
-(* Il y a souvent une fonction runX pour une monade X. par exemple, pour State, runState :: State s a -> s -> (a, s)
-Tu lui donnes une _action_ (une valeur monadique), les arguments nécessaires (l’état initial pour une monade d’état) et ça « déclenche » le calcul
-Bref, pour une boucle, on va vouloir effectuer la boucle et obtenir le résultat dans la monade sous-jacente (celle d’état de Pip), par exemple *)
-Definition runLoopT A m (op : LoopT m A) (next : A -> m R) : m R := 
-match op with 
-| C_LoopT  p => loop next
-end.
+Definition runLoopT {m c r} : LoopT m c -> (c -> m r) -> m r :=
+  fun loop next =>
+    match loop with
+    | MkLoopT body => body r next
+    end.
+
+Arguments runLoopT {_} {_} {_}.
+
 Check runLoopT.
 
-Generalizable Variables A B C.
+(* fmap for Loop *)
+Definition loopT_fmap {m A B} (f : A -> B) (x : LoopT m A) : LoopT m B :=
+  MkLoopT (fun _ cont => runLoopT x (cont ∘ f)).
 
-Definition loop_fmap {m} `{Monad m}  {A B} (f : A -> B) (x : LoopT m A) : LoopT m B :=
-CLoopT (fun cont => runLoop (cont ∘ f)).
+(* Functor instance *)
+Instance loopT_F {m} : Functor (LoopT m) :=
+    { fmap := @loopT_fmap m}.
+
+(* Functor proof *)
+Instance loopT_Fcorrect {m} : Functor_Correct (LoopT m).
+  Proof.
+  Admitted.
+
+(* pure for Loop *)
+Definition loopT_pure {m A} (a : A) : LoopT m A :=
+MkLoopT (fun _ cont => cont a).
+
+(* <*> for Loop *)
+Definition loopT_liftA {m A B} (f1 : LoopT m (A -> B)) (f2 : LoopT m A) : LoopT m B :=
+  MkLoopT (fun _ cont => 
+    let f' := (fun f => runLoopT f2 (cont ∘ f)) in 
+    runLoopT f1 f').
+
+(* Applicative instance *)
+Instance loopT_A {m} : Applicative (LoopT m) :=
+    { pure := @loopT_pure  m
+      ; liftA := @loopT_liftA m}.
+
+(* Applicative *)
+Instance loopT_Acorrect {m} : Applicative_Correct (LoopT m).
+  Proof.
+  Admitted.
+
+(* >>= for Loop *)
+Definition loopT_bind {m A} (x : LoopT m A) {B} (k : A -> LoopT m B) : LoopT m B :=
+  MkLoopT (fun _ cont => 
+    let f' := (fun a => runLoopT (k a) cont) in 
+    runLoopT x f').
+
+(* Monad instance *)
+Instance loopT_M {m} : Monad (LoopT m) :=
+  {bind := @loopT_bind m}.
+
+Instance loopT_Mcorrect {m} : Monad_Correct (LoopT m).
+  Proof.
+  Admitted.
+
+Definition loopT_liftT {m} `{Monad m} {A} (x : m A) : LoopT m A :=
+ MkLoopT (fun _ cont => bind x cont). 
+
+Instance LoopT_T  : MonadTrans LoopT := 
+{ liftT := @loopT_liftT}.
 
 
-(* Definition loop_pure {A} (x : A) : LoopT m A := *)
 
-(* Definition loop_liftA {A B} (loop_f : LoopT m (A -> B)) (loop_a : LoopT m A) := *)
-
-(* Definition loop_bind {A B} (loop_A : LoopT m A) (f : A -> LoopT m B) := *)
-
-(* Definition loop
-
-Definition 
-
-Check LoopT.
-
-
-
-(* Definition loopA_pure {A} (a : A) : LoopT A :=
-(fun _ _ cont => LoopT _ _ (cont a)). *)
-
-
-(* Instance loopT_pure {f} : `{Applicative f}
-                    {A} : (a : A) : LoopT f A := @pure f _ _ _ (pure a). *)
-
-
-Instance Loop_F : Functor option := { fmap := @option_fmap}.
