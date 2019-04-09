@@ -107,26 +107,7 @@ Set Maximal Implicit Insertion.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 
-Axiom Eta: forall A (B: A -> Type) (f: forall a, B a), f = fun  a=>f a.
-
-(* Generalizable All Variables.
-(* Unset Implicit Arguments. *) *)
-(* Set Maximal Implicit Insertion.
-Unset Strict Implicit. *)
-(*newtype LoopT c e m a = LoopT
-    { runLoopT :: forall r.     -- This universal quantification forces the
-                                -- LoopT computation to call one of the
-                                -- following continuations.
-                  (c -> m r)    -- continue
-               -> (e -> m r)    -- exit
-               -> (a -> m r)    -- return a value
-               -> m r
-    } *)
-
-(* pas convaincue *)
-(* Variable r : Type. *)
-
-
+(* Axiom Eta: forall A (B: A -> Type) (f: forall a, B a), f = fun  a=>f a. *)
 
 Inductive LoopT m c : Type
   := MkLoopT : (forall {r : Type}, (c -> m r) -> m r) -> LoopT m c.
@@ -196,5 +177,67 @@ Definition loopT_liftT {m} `{Monad m} {A} (x : m A) : LoopT m A :=
 Instance LoopT_T  : MonadTrans LoopT := 
 { liftT := @loopT_liftT}.
 
+End monadic_loop.
 
+Section monadic_state.
 
+Record S := {
+  myval : nat
+}.
+
+Definition State (A : Type) := S -> A * S.
+
+Definition state_fmap A B (f : A -> B) (st : State A) : State B :=
+  fun  s => let (a,s) := st s in (f a,s).
+
+Definition state_liftA A B (st_f : State (A -> B)) (st_a : State A) :=
+  fun  s => let (f,s) := st_f s in
+            let (a,s) := st_a s in
+            (f a,s).
+Definition state_bind A (st_a : State A) B  (f : A -> State B) :=
+  fun  s => let (a,s) := st_a s in
+            f a s.
+
+Definition put (x : S) : State () :=
+  fun _ => (tt,x).
+
+Definition get : State S :=
+  fun x => (x,x).
+
+Definition runState  {A} (op : State A) : S -> A * S := op.
+Definition evalState {A} (op : State A) : S -> A := fst ∘ op.
+Definition execState {A} (op : State A) : S -> S := snd ∘ op.
+
+Instance stateF : Functor (State) :=
+    { fmap := @state_fmap}.
+
+Instance stateA : Applicative (State) :=
+    { pure := fun A a s=> (a,s);
+      liftA := @state_liftA }.
+
+Instance stateM : Monad (State) :=
+    { bind := @state_bind}.
+
+Instance stateF_correct : Functor_Correct State.
+  Proof.
+  Admitted.
+
+Instance stateA_correct : Applicative_Correct (State).
+  Proof.
+  Admitted.
+
+Instance stateM_correct : Monad_Correct State.
+  Proof.
+  Admitted.
+
+End monadic_state.
+
+Section test.
+
+Definition i := 5.
+
+Definition init_S := {| myval := 5|}.
+
+Definition getinit_S : stateM nat:= pure i.
+
+Compute runState init_S.
