@@ -8,7 +8,6 @@ Set Implicit Arguments.
 
 Import Notations.
 (* Import Arith. *)
-Import List.
 
 Local Notation "f ∘ g" := (fun x => f (g x)) (at level 40, left associativity).
 
@@ -94,7 +93,6 @@ Qed.
 Class MonadTrans (t : (Type -> Type) -> (Type -> Type)) :=
   { liftT : forall {m} `{Monad m} {A}, m A -> t m A }.
 
-
 Notation "a >> f" := (wbind _ a f) (at level 50, left associativity).
 Notation "'do' a <- e ; c" := (e >>= (fun  a => c)) (at level 60, right associativity).
 
@@ -110,7 +108,7 @@ Unset Printing Implicit Defensive.
 (* Axiom Eta: forall A (B: A -> Type) (f: forall a, B a), f = fun  a=>f a. *)
 
 Inductive LoopT m c : Type
-  := MkLoopT : (forall {r : Type}, (c -> m r) -> m r) -> LoopT m c.
+  := MkLoopT : (forall (r : Type), (c -> m r) -> m r) -> LoopT m c.
 
 Arguments MkLoopT {_} {_} _.
 
@@ -172,14 +170,42 @@ Instance loopT_Mcorrect {m} : Monad_Correct (LoopT m).
   Admitted.
 
 Definition loopT_liftT {m} `{Monad m} {A} (x : m A) : LoopT m A :=
- MkLoopT (fun _ cont => bind x cont). 
+ MkLoopT (fun _ cont => x >>= cont). 
 
 Instance LoopT_T  : MonadTrans LoopT := 
 { liftT := @loopT_liftT}.
 
-
-
 End monadic_loop.
+
+Section function_loop.
+
+Import List.
+
+Definition stepLoopT {m} `{Monad m} {c} (body : LoopT m c) {r} (next : c -> m r) : m r :=
+  runLoopT body next.
+
+(* Fixpoint foreach'' {m} `{Monad m} a (values : list a) {c} (body : a -> LoopT m c) : m unit :=
+  match values with 
+  | nil => return_ tt
+  | (x::xs) => let next := (fun _ => foreach'' a xs body) in stepLoopT (body x) next
+  end. *)
+
+(* Boucle qui prend une liste en paramètres et applique le corps de boucle pour chaque élement de la liste *)
+Definition foreach' {m} `{Monad m} {a} (values : list a) {c} (body : a -> LoopT m c) : m unit :=
+  fold_right
+    (fun x next => stepLoopT (body x) (fun _ => next))
+    (return_ tt)
+    values.
+
+(* Boucle avec un min et max qui appelle foreach' *)
+Definition foreach {m} `{Monad m} (min max : nat) {c} (body : nat -> LoopT m c) : m unit :=
+  foreach' (seq min max) body.
+
+(* Fonction qui appelle une fois le corps de la boucle *)
+Definition once {m} `{Monad m} {c} (body : LoopT m c) : m unit :=
+stepLoopT body (fun _ => return_ tt).
+
+End function_loop.
 
 Section monadic_state.
 
@@ -210,6 +236,9 @@ Definition runState  {A} (op : State A) : S -> A * S := op.
 Definition evalState {A} (op : State A) : S -> A := fst ∘ op.
 Definition execState {A} (op : State A) : S -> S := snd ∘ op.
 
+(* Notation "'perform' x ':=' m 'in' e" := (bind m (fun x => e))
+Notation "'do' a <- e ; c" := (e >>= (fun  a => c)) (at level 60, right associativity). *)
+
 Instance stateF : Functor (State) :=
     { fmap := @state_fmap}.
 
@@ -219,6 +248,9 @@ Instance stateA : Applicative (State) :=
 
 Instance stateM : Monad (State) :=
     { bind := @state_bind}.
+
+Definition modify (f : S -> S) : State unit :=
+  get >>= (fun s => put (f s)).
 
 Instance stateF_correct : Functor_Correct State.
   Proof.
@@ -236,12 +268,12 @@ End monadic_state.
 
 Section test.
 
-Definition i := 5.
+Definition init_val := 0.
 
-Definition init_S := {| myval := 5|}.
+Definition init_S := {| myval := init_val|}.
 
-Check State nat.
+Definition changeState (i : nat) : State unit :=
+  modify (fun s => {| myval := s.(myval) + i |}).
 
-Definition getinit_S : State nat.
+Compute runState (foreach 0 5 (fun i => (MkLoopT (liftM (changeState i))))) init_S.
 
-Compute runState init_S.
