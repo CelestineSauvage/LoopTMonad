@@ -275,5 +275,7 @@ Definition init_S := {| myval := init_val|}.
 Definition changeState (i : nat) : State unit :=
   modify (fun s => {| myval := s.(myval) + i |}).
 
-Compute runState (foreach 0 5 (fun i => (MkLoopT (liftM (changeState i))))) init_S.
+Check runState (foreach 0 5 (fun i => (liftT (changeState i)))) init_S.
+
+Compute runState (foreach 0 5 (fun i => (liftT (changeState i)))) init_S.
 
