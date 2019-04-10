@@ -175,9 +175,9 @@ Definition loopT_liftT {m} `{Monad m} {A} (x : m A) : LoopT m A :=
 Instance LoopT_T  : MonadTrans LoopT := 
 { liftT := @loopT_liftT}.
 
-End monadic_loop.
+(* End monadic_loop.
 
-Section function_loop.
+Section function_loop. *)
 
 Import List.
 
@@ -205,9 +205,9 @@ Definition foreach {m} `{Monad m} (min max : nat) {c} (body : nat -> LoopT m c) 
 Definition once {m} `{Monad m} {c} (body : LoopT m c) : m unit :=
 stepLoopT body (fun _ => return_ tt).
 
-End function_loop.
+(* End function_loop.
 
-Section monadic_state.
+Section monadic_state. *)
 
 Record S := {
   myval : nat
@@ -264,9 +264,11 @@ Instance stateM_correct : Monad_Correct State.
   Proof.
   Admitted.
 
-End monadic_state.
+(* End monadic_state.
 
-Section test.
+Section test. *)
+
+Context `{LA : LoopT State unit}.
 
 Definition init_val := 0.
 
@@ -275,7 +277,7 @@ Definition init_S := {| myval := init_val|}.
 Definition changeState (i : nat) : State unit :=
   modify (fun s => {| myval := s.(myval) + i |}).
 
-Check runState (foreach 0 5 (fun i => (liftT (changeState i)))) init_S.
+Check runState (foreach 0 6 (fun i => (liftT (changeState i)))) init_S.
 
-Compute runState (foreach 0 5 (fun i => (liftT (changeState i)))) init_S.
+Compute runState (foreach 0 6 (fun i => (liftT (changeState i)))) init_S.
 
