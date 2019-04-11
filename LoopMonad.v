@@ -199,7 +199,9 @@ Definition foreach' {m} `{Monad m} {a} (values : list a) {c} (body : a -> LoopT 
 
 (* Boucle avec un min et max qui appelle foreach' *)
 Definition foreach {m} `{Monad m} (min max : nat) {c} (body : nat -> LoopT m c) : m unit :=
-  foreach' (seq min max) body.
+  foreach' (seq min (max-min)) body.
+
+Search (nat -> nat -> list nat).
 
 (* Fonction qui appelle une fois le corps de la boucle *)
 Definition once {m} `{Monad m} {c} (body : LoopT m c) : m unit :=
@@ -236,9 +238,6 @@ Definition runState  {A} (op : State A) : S -> A * S := op.
 Definition evalState {A} (op : State A) : S -> A := fst ∘ op.
 Definition execState {A} (op : State A) : S -> S := snd ∘ op.
 
-(* Notation "'perform' x ':=' m 'in' e" := (bind m (fun x => e))
-Notation "'do' a <- e ; c" := (e >>= (fun  a => c)) (at level 60, right associativity). *)
-
 Instance stateF : Functor (State) :=
     { fmap := @state_fmap}.
 
@@ -268,7 +267,7 @@ Instance stateM_correct : Monad_Correct State.
 
 Section test. *)
 
-Context `{LA : LoopT State unit}.
+(* Context `{LA : LoopT State unit}. *)
 
 Definition init_val := 0.
 
@@ -277,7 +276,7 @@ Definition init_S := {| myval := init_val|}.
 Definition changeState (i : nat) : State unit :=
   modify (fun s => {| myval := s.(myval) + i |}).
 
-Check runState (foreach 0 6 (fun i => (liftT (changeState i)))) init_S.
+Check runState (foreach 0 5 (fun i => (liftT (changeState i)))) init_S.
 
-Compute runState (foreach 0 6 (fun i => (liftT (changeState i)))) init_S.
+Compute runState (foreach 0 5 (fun i => (liftT (changeState i)))) init_S.
 
