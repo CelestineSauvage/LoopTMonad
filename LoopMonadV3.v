@@ -57,7 +57,7 @@ Class MonadTrans (t : (Type -> Type) -> (Type -> Type)) :=
   { liftT : forall {m} `{Monad m} {A}, m A -> t m A }.
 
 Notation "a >> f" := (wbind _ a f) (at level 50, left associativity).
-Notation "'do' a <- e ; c" := (e >>= (fun  a => c)) (at level 60, right associativity).
+Notation "'perf' a <- e ; c" := (e >>= (fun  a => c)) (at level 60, right associativity).
 
 End monadic_functions.
 
@@ -67,6 +67,8 @@ Inductive LoopT m c : Type
   := MkLoopT : (forall (r : Type), (c -> m r) -> m r) -> LoopT m c.
 
 Arguments MkLoopT {_} {_} _.
+
+Check MkLoopT.
 
 Definition runLoopT {m c r} : LoopT m c -> (c -> m r) -> m r :=
   fun loop next =>
@@ -111,15 +113,15 @@ Definition stepLoopT {m} `{Monad m} {c} (body : LoopT m c) {r} (next : c -> m r)
   runLoopT body next.
 
 (* Boucle qui prend une liste en paramètres et applique le corps de boucle pour chaque élement de la liste *)
-Definition foreach' {m} `{Monad m} {a} (values : list a) {c} (body : a -> LoopT m c) : m unit :=
+Definition foreach'' {m} `{Monad m} {a} (values : list a) {c} (body : a -> LoopT m c) : m unit :=
   fold_right
     (fun x next => stepLoopT (body x) (fun _ => next))
     (return_ tt)
     values.
 
 (* Boucle avec un min et max qui appelle foreach' *)
-Definition foreach {m} `{Monad m} (min max : nat) {c} (body : nat -> LoopT m c) : m unit :=
-  foreach' (seq min (max-min)) body.
+Definition foreach' {m} `{Monad m} (min max : nat) {c} (body : nat -> LoopT m c) : m unit :=
+  foreach'' (seq min (max-min)) body.
 
 (* Fonction qui appelle une fois le corps de la boucle *)
 Definition once {m} `{Monad m} {c} (body : LoopT m c) : m unit :=
@@ -159,7 +161,14 @@ Definition init_S := {| myval := init_val|}.
 Definition changeState (i : nat) : State unit :=
   modify (fun s => {| myval := s.(myval) + i |}).
 
-Check runState (foreach 0 5 (fun i => (liftT (changeState i)))) init_S.
+Check runState (foreach' 0 5 (fun i => (liftT (changeState i)))) init_S.
+
+Notation "'foreach i '=' min 'to' max '{{' body }}" := (foreach' min max (fun i => (body))) (at level 60, i ident, min at level 60, 
+max at level 60, body at level 200, right associativity).
+
+(*  format "'[v' '[' 'foreach'  i  '='  min  'to'  max ']' '/' '[' '{{' body '}}' ']' ']'")  *)
+
+(* Compute runState (foreach i = 0 to 5 {{liftT (changeState i)}} init_S. *)
 
 Compute runState (foreach 0 5 (fun i => (liftT (changeState i)))) init_S.
 
