@@ -147,7 +147,11 @@ stepLoopT body (fun _ => return_ tt).
   myval : nat
 }. *)
 
-Variable S : Type.
+Record S := {
+  my_list : list nat
+}.
+
+(* Variable S : Type. *)
 
 Definition State (A : Type) := S -> A * S.
 
@@ -176,10 +180,10 @@ Definition modify (f : S -> S) : State unit :=
 
 End monadic_loop.
 
-End Monad.
-(* Definition init_val := 0. *)
+(* End Monad. *)
+(* Definition init_val := 0.
 
-(* Definition init_S := {| myval := init_val|}.
+Definition init_S := {| myval := init_val|}.
 
 Definition changeState (i : nat) : State unit :=
   modify (fun s => {| myval := s.(myval) + i |}).
@@ -195,6 +199,25 @@ max at level 60, body at level 60, right associativity).
 (* Compute runState (foreach i = 0 bip 5 {{liftT (changeState i)}} init_S. *)
 
 Compute runState (foreach' 0 5 (fun i => (liftT (changeState i)))) init_S.
+ *)
 
-(* Programme qui initialise tous les élements d'une liste *) *)
+
+(* Programme qui initialise tous les élements d'une liste *)
+Open Scope list_scope.
+
+Definition nth := 10.
+
+Definition init_S := {| my_list := List.repeat 0 nth |}.
+
+Fixpoint set_i_eme (i val : nat) (liste : list nat) : list nat :=
+  match liste, i with
+    | [], _ => []
+    | x::xs, 0 => (val :: xs)
+    | x::xs, j =>  x :: (set_i_eme (j-1) val xs)
+  end.
+
+Definition changeIemeElement (i val : nat) : State unit :=
+  modify (fun s => {| my_list := set_i_eme i val s.(my_list)|}).
+
+Compute runState (foreach' 0 nth (fun i => (liftT (changeIemeElement i i)))) init_S.
 
