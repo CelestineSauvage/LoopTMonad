@@ -90,10 +90,10 @@ Definition loopT_pure {m A} (a : A) : LoopT m A :=
 MkLoopT (fun _ cont => cont a).
 
 (* <*> for Loop *)
-Definition loopT_liftA {m A B} (f1 : LoopT m (A -> B)) (f2 : LoopT m A) : LoopT m B :=
+(* Definition loopT_liftA {m A B} (f1 : LoopT m (A -> B)) (f2 : LoopT m A) : LoopT m B :=
   MkLoopT (fun _ cont => 
     let f' := (fun f => runLoopT f2 (cont ∘ f)) in 
-    runLoopT f1 f').
+    runLoopT f1 f'). *)
 
 (* >>= for Loop *)
 Definition loopT_bind {m A} (x : LoopT m A) {B} (k : A -> LoopT m B) : LoopT m B :=
@@ -205,6 +205,9 @@ Compute runState (foreach' 0 5 (fun i => (liftT (changeState i)))) init_S.
 (* Programme qui initialise tous les élements d'une liste *)
 Open Scope list_scope.
 
+Notation "'foreach' i '=' min 'to' max '{{' body }}" := (foreach' min max (fun i => (body))) (at level 60, i ident, min at level 60, 
+max at level 60, body at level 60, right associativity).
+
 Definition nth := 10.
 
 Definition init_S := {| my_list := List.repeat 0 nth |}.
@@ -219,5 +222,7 @@ Fixpoint set_i_eme (i val : nat) (liste : list nat) : list nat :=
 Definition changeIemeElement (i val : nat) : State unit :=
   modify (fun s => {| my_list := set_i_eme i val s.(my_list)|}).
 
-Compute runState (foreach' 0 nth (fun i => (liftT (changeIemeElement i i)))) init_S.
+Compute runState (foreach i = 0 to nth {{liftT (changeIemeElement i i)}}) init_S.
+
+(* Compute runState (foreach 0 nth (fun i => (liftT (changeIemeElement i i)))) init_S. *)
 
