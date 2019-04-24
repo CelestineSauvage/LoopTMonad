@@ -64,30 +64,22 @@ End monadic_functions.
 
 Section monadic_loop.
 
-Inductive LoopT m c : Type
-  := MkLoopT : (forall (r : Type), (c -> m r) -> m r) -> LoopT m c.
+Definition LoopT m a : Type := (forall (r : Type), (a -> m r) -> m r).
 
-Arguments MkLoopT {_} {_} _.
-
-Check MkLoopT.
+Check LoopT.
 
 Definition runLoopT {m c r} : LoopT m c -> (c -> m r) -> m r :=
-  fun loop next =>
-    match loop with
-    | MkLoopT body => body r next
-    end.
+  fun loop next => loop r next.
 
 Arguments runLoopT {_} {_} {_}.
 
-Check runLoopT.
-
 (* pure for Loop *)
 Definition loopT_pure {m A} (a : A) : LoopT m A :=
-MkLoopT (fun _ cont => cont a).
+(fun _ cont => cont a).
 
 (* >>= for Loop *)
 Definition loopT_bind {m A} (x : LoopT m A) {B} (k : A -> LoopT m B) : LoopT m B :=
-  MkLoopT (fun _ cont => 
+  (fun _ cont => 
     let f' := (fun a => runLoopT (k a) cont) in 
     runLoopT x f').
 
@@ -97,13 +89,10 @@ Global Instance loopT_M {m} : Monad (LoopT m) :=
     bind := @loopT_bind m}.
   Proof.
   + intros;simpl; unfold loopT_bind; unfold loopT_pure; simpl; unfold runLoopT.
-    case a.
     auto.
   + intros;simpl; unfold loopT_bind; unfold loopT_pure; simpl; unfold runLoopT.
-    case (f a).
     auto.
   + intros;simpl; unfold loopT_bind; unfold loopT_pure; simpl; unfold runLoopT.
-    case (ma).
     auto.
   Qed.
 
@@ -111,7 +100,7 @@ Variable m : Type -> Type.
 Context `{Monad m}. 
 
 Definition loopT_liftT {A} (x : m A) : LoopT m A :=
- MkLoopT (fun _ cont => x >>= cont). 
+(fun _ cont => x >>= cont). 
 
 Global Instance LoopT_T  : MonadTrans LoopT := 
 { liftT := @loopT_liftT}.
@@ -140,7 +129,9 @@ Definition foreach' {m} `{Monad m} (min max : nat) {c} (body : nat -> LoopT m c)
 Definition once {m} `{Monad m} {c} (body : LoopT m c) : m unit :=
 stepLoopT body (fun _ => return_ tt).
 
-Variable S : Type.
+Record S := {
+  mylist : list nat
+}.
 
 Definition State (A : Type) := S -> A * S.
 
@@ -169,6 +160,19 @@ Admitted.
 Definition modify (f : S -> S) : State unit :=
   get >>= (fun s => put (f s)).
 
-Abort All.
+Definition addElement (val : nat) : State unit :=
+  modify (fun s => {| mylist := val :: s.(mylist)|}).
 
-End monadic_loop.
+(* End monadic_loop. *)
+
+Open Scope list_scope.
+
+Notation "'foreach' i '=' min 'to' max '{{' body }}" := (foreach' min max (fun i => (liftT body))) (at level 60, i ident, min at level 60, 
+max at level 60, body at level 60, right associativity).
+
+Definition nth := 4.
+
+Definition init_S := {| mylist := [] |}.
+
+Compute runState (foreach i = 0 to nth {{ foreach j = 0 to nth {{addElement (i+j) }} }} ) init_S.
+
