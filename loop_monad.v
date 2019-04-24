@@ -10,22 +10,19 @@ Import Notations.
 
 Local Notation "f ∘ g" := (fun x => f (g x)) (at level 40, left associativity).
 
-Class Monad (m: Type -> Type) : Type :=
+Class Monad (m: Type -> Type) :=
 { return_ : forall {A}, A -> m A;
-  bind: forall {A}, m A -> forall {B}, (A -> m B) -> m B
+  bind: forall {A}, m A -> forall {B}, (A -> m B) -> m B;
+  bind_right_unit: forall A (a: m A), a = bind a return_;
+  bind_left_unit: forall A (a: A) B (f: A -> m B),
+             f a = bind (return_ a) f;
+  bind_associativity: forall A (ma: m A) B f C (g: B -> m C),
+                 bind ma (fun  x=> bind (f x) g) = bind (bind ma f) g
 }.
 
 Notation "a >>= f" := (bind a f) (at level 50, left associativity).
 
 Hint Unfold bind return_ : monad_db.
-
-Class Monad_Correct (m : Type -> Type) `{M : Monad m} := {
-  bind_right_unit: forall A (a: m A), a = a >>= return_;
-  bind_left_unit: forall A (a: A) B (f: A -> m B),
-             f a = return_ a >>= f;
-  bind_associativity: forall A (ma: m A) B f C (g: B -> m C),
-                 bind ma (fun  x=> f x >>= g) = (ma >>= f) >>= g
-}.
 
 (* Monad Transformer *)
 Class MonadTrans {m} `{Monad m} (t : (Type -> Type) -> (Type -> Type)) `{Monad (t m)}  := {
@@ -35,7 +32,6 @@ Class MonadTrans {m} `{Monad m} (t : (Type -> Type) -> (Type -> Type)) `{Monad (
 }.
 
 Arguments Monad m : assert.
-Arguments Monad_Correct m [M] : rename.
 
 Section monadic_functions.
  Variable m : Type -> Type. 
@@ -99,15 +95,15 @@ Definition loopT_bind {m A} (x : LoopT m A) {B} (k : A -> LoopT m B) : LoopT m B
 Global Instance loopT_M {m} : Monad (LoopT m) :=
   { return_ := @loopT_pure m;
     bind := @loopT_bind m}.
-
-Instance loopT_Mcorrect {m} : Monad_Correct (LoopT m).
   Proof.
-  constructor;intros;simpl; unfold loopT_bind; unfold loopT_pure; simpl; unfold runLoopT. (* permet d'avoir les 3 lois *)
-  + case a.
+  + intros;simpl; unfold loopT_bind; unfold loopT_pure; simpl; unfold runLoopT.
+    case a.
     auto.
-  + case (f a).
+  + intros;simpl; unfold loopT_bind; unfold loopT_pure; simpl; unfold runLoopT.
+    case (f a).
     auto.
-  + case (ma).
+  + intros;simpl; unfold loopT_bind; unfold loopT_pure; simpl; unfold runLoopT.
+    case (ma).
     auto.
   Qed.
 
@@ -119,6 +115,9 @@ Definition loopT_liftT {A} (x : m A) : LoopT m A :=
 
 Global Instance LoopT_T  : MonadTrans LoopT := 
 { liftT := @loopT_liftT}.
+Proof.
+  + intros.
+    unfold loopT_liftT.
 Admitted.
 
 Import List.
@@ -140,14 +139,6 @@ Definition foreach' {m} `{Monad m} (min max : nat) {c} (body : nat -> LoopT m c)
 (* Fonction qui appelle une fois le corps de la boucle *)
 Definition once {m} `{Monad m} {c} (body : LoopT m c) : m unit :=
 stepLoopT body (fun _ => return_ tt).
-
-(* Record S := {
-  myval : nat
-}. *)
-(* 
-Record S := {
-  my_list : list nat
-}. *)
 
 Variable S : Type.
 
@@ -172,8 +163,12 @@ Definition execState {A} (op : State A) : S -> S := snd ∘ op.
 Global Instance stateM : Monad (State) :=
     { return_ := fun A a s=> (a,s);
       bind := @state_bind}.
+Proof.
+Admitted.
 
 Definition modify (f : S -> S) : State unit :=
   get >>= (fun s => put (f s)).
+
+Abort All.
 
 End monadic_loop.

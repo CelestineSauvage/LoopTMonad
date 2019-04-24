@@ -1,4 +1,3 @@
-(* Require Import Monad. *)
 Load loop_monad.
 
 Record S := {
