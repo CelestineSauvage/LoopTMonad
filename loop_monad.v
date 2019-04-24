@@ -58,8 +58,9 @@ Section monadic_functions.
   Qed.
 
 (* Monad Transformer *)
-Class MonadTrans (t : (Type -> Type) -> (Type -> Type)) :=
-  { liftT : forall {m} `{Monad m} {A}, m A -> t m A }.
+Class MonadTrans {m} `{Monad m} (t : (Type -> Type) -> (Type -> Type)) `{Monad (t m)}  := {
+  liftT : forall {A}, m A -> t m A
+}.
 
 Notation "a >> f" := (wbind _ a f) (at level 50, left associativity).
 Notation "'perf' a <- e ; c" := (e >>= (fun  a => c)) (at level 60, right associativity).
@@ -117,7 +118,10 @@ Instance loopT_Mcorrect {m} : Monad_Correct (LoopT m).
     auto.
   Qed.
 
-Definition loopT_liftT {m} `{Monad m} {A} (x : m A) : LoopT m A :=
+Variable m : Type -> Type.
+Context `{Monad m}. 
+
+Definition loopT_liftT {A} (x : m A) : LoopT m A :=
  MkLoopT (fun _ cont => x >>= cont). 
 
 Global Instance LoopT_T  : MonadTrans LoopT := 
@@ -205,24 +209,17 @@ Compute runState (foreach' 0 5 (fun i => (liftT (changeState i)))) init_S.
 (* Programme qui initialise tous les élements d'une liste *)
 Open Scope list_scope.
 
-Notation "'foreach' i '=' min 'to' max '{{' body }}" := (foreach' min max (fun i => (body))) (at level 60, i ident, min at level 60, 
+Notation "'foreach' i '=' min 'to' max '{{' body }}" := (foreach' min max (fun i => (liftT body))) (at level 60, i ident, min at level 60, 
 max at level 60, body at level 60, right associativity).
 
-Definition nth := 10.
+Definition nth := 4.
 
-Definition init_S := {| my_list := List.repeat 0 nth |}.
+Definition init_S := {| my_list := [] |}.
 
-Fixpoint set_i_eme (i val : nat) (liste : list nat) : list nat :=
-  match liste, i with
-    | [], _ => []
-    | x::xs, 0 => (val :: xs)
-    | x::xs, j =>  x :: (set_i_eme (j-1) val xs)
-  end.
+Definition addElement (val : nat) : State unit :=
+  modify (fun s => {| my_list := val :: s.(my_list)|}).
 
-Definition changeIemeElement (i val : nat) : State unit :=
-  modify (fun s => {| my_list := set_i_eme i val s.(my_list)|}).
-
-Compute runState (foreach i = 0 to nth {{liftT (changeIemeElement i i)}}) init_S.
+Compute runState (foreach i = 0 to nth {{ foreach j = 0 to nth {{addElement (i+j) }} }} ) init_S.
 
 (* Compute runState (foreach 0 nth (fun i => (liftT (changeIemeElement i i)))) init_S. *)
 
