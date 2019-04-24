@@ -7,7 +7,6 @@ Module Monad.
 Set Implicit Arguments.
 
 Import Notations.
-(* Import Arith. *)
 
 Local Notation "f ∘ g" := (fun x => f (g x)) (at level 40, left associativity).
 
@@ -28,14 +27,19 @@ Class Monad_Correct (m : Type -> Type) `{M : Monad m} := {
                  bind ma (fun  x=> f x >>= g) = (ma >>= f) >>= g
 }.
 
-Check Monad_Correct.
+(* Monad Transformer *)
+Class MonadTrans {m} `{Monad m} (t : (Type -> Type) -> (Type -> Type)) `{Monad (t m)}  := {
+  liftT : forall {A}, m A -> t m A;
+  lifT_id : forall {A : Type} (a : A), (liftT ∘ return_) a = return_ a;
+  lifT_bind : forall A B (ma : m A) (k : A -> m B), liftT (ma >>= k) = (liftT ma) >>= (liftT ∘ k)
+}.
 
 Arguments Monad m : assert.
 Arguments Monad_Correct m [M] : rename.
 
 Section monadic_functions.
  Variable m : Type -> Type. 
- Variable Mo : Monad m.
+ Context `{Monad m}.
 
  Definition wbind {A: Type} (ma: m A) {B: Type} (mb: m B) :=
  ma >>= fun  _=>mb.
@@ -56,11 +60,6 @@ Section monadic_functions.
     apply functional_extensionality.
     auto.
   Qed.
-
-(* Monad Transformer *)
-Class MonadTrans {m} `{Monad m} (t : (Type -> Type) -> (Type -> Type)) `{Monad (t m)}  := {
-  liftT : forall {A}, m A -> t m A
-}.
 
 Notation "a >> f" := (wbind _ a f) (at level 50, left associativity).
 Notation "'perf' a <- e ; c" := (e >>= (fun  a => c)) (at level 60, right associativity).
@@ -89,12 +88,6 @@ Check runLoopT.
 (* pure for Loop *)
 Definition loopT_pure {m A} (a : A) : LoopT m A :=
 MkLoopT (fun _ cont => cont a).
-
-(* <*> for Loop *)
-(* Definition loopT_liftA {m A B} (f1 : LoopT m (A -> B)) (f2 : LoopT m A) : LoopT m B :=
-  MkLoopT (fun _ cont => 
-    let f' := (fun f => runLoopT f2 (cont ∘ f)) in 
-    runLoopT f1 f'). *)
 
 (* >>= for Loop *)
 Definition loopT_bind {m A} (x : LoopT m A) {B} (k : A -> LoopT m B) : LoopT m B :=
@@ -126,6 +119,7 @@ Definition loopT_liftT {A} (x : m A) : LoopT m A :=
 
 Global Instance LoopT_T  : MonadTrans LoopT := 
 { liftT := @loopT_liftT}.
+Admitted.
 
 Import List.
 
@@ -150,12 +144,12 @@ stepLoopT body (fun _ => return_ tt).
 (* Record S := {
   myval : nat
 }. *)
-
+(* 
 Record S := {
   my_list : list nat
-}.
+}. *)
 
-(* Variable S : Type. *)
+Variable S : Type.
 
 Definition State (A : Type) := S -> A * S.
 
@@ -183,43 +177,3 @@ Definition modify (f : S -> S) : State unit :=
   get >>= (fun s => put (f s)).
 
 End monadic_loop.
-
-(* End Monad. *)
-(* Definition init_val := 0.
-
-Definition init_S := {| myval := init_val|}.
-
-Definition changeState (i : nat) : State unit :=
-  modify (fun s => {| myval := s.(myval) + i |}).
-
-Check runState (foreach' 0 5 (fun i => (liftT (changeState i)))) init_S.
-
-(* Voir pour plus tard *)
-Notation "'foreach i '=' min 'to' max '{{' body }}" := (foreach' min max (fun i => (body))) (at level 60, i ident, min at level 60, 
-max at level 60, body at level 60, right associativity).
-
-(*  format "'[v' '[' 'foreach'  i  '='  min  'to'  max ']' '/' '[' '{{' body '}}' ']' ']'")  *)
-
-(* Compute runState (foreach i = 0 bip 5 {{liftT (changeState i)}} init_S. *)
-
-Compute runState (foreach' 0 5 (fun i => (liftT (changeState i)))) init_S.
- *)
-
-
-(* Programme qui initialise tous les élements d'une liste *)
-Open Scope list_scope.
-
-Notation "'foreach' i '=' min 'to' max '{{' body }}" := (foreach' min max (fun i => (liftT body))) (at level 60, i ident, min at level 60, 
-max at level 60, body at level 60, right associativity).
-
-Definition nth := 4.
-
-Definition init_S := {| my_list := [] |}.
-
-Definition addElement (val : nat) : State unit :=
-  modify (fun s => {| my_list := val :: s.(my_list)|}).
-
-Compute runState (foreach i = 0 to nth {{ foreach j = 0 to nth {{addElement (i+j) }} }} ) init_S.
-
-(* Compute runState (foreach 0 nth (fun i => (liftT (changeIemeElement i i)))) init_S. *)
-
