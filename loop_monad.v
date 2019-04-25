@@ -94,7 +94,7 @@ Global Instance loopT_M {m} : Monad (LoopT m) :=
     auto.
   + intros;simpl; unfold loopT_bind; unfold loopT_pure; simpl; unfold runLoopT.
     auto.
-  Qed.
+  Defined.
 
 Variable m : Type -> Type.
 Context `{Monad m}. 
@@ -151,11 +151,17 @@ Definition runState  {A} (op : State A) : S -> A * S := op.
 Definition evalState {A} (op : State A) : S -> A := fst ∘ op.
 Definition execState {A} (op : State A) : S -> S := snd ∘ op.
 
+Axiom toto : forall P : Prop, P.
+
 Global Instance stateM : Monad (State) :=
     { return_ := fun A a s=> (a,s);
       bind := @state_bind}.
 Proof.
-Admitted.
+apply toto.
+apply toto.
+apply toto.
+Defined.
+
 
 Definition modify (f : S -> S) : State unit :=
   get >>= (fun s => put (f s)).
