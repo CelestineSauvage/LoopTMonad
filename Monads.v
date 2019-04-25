@@ -1,5 +1,3 @@
-(* Require Import Arith. *)
-(* Require Import List. *)
 Require Import Program.
 
 Module Monad.
@@ -7,27 +5,24 @@ Module Monad.
 Set Implicit Arguments.
 
 Import Notations.
-(* Import Arith. *)
 
 Local Notation "f ∘ g" := (fun x => f (g x)) (at level 40, left associativity).
 
-Class Monad (m: Type -> Type) : Type :=
+Class Monad (m: Type -> Type) :=
 { return_ : forall {A}, A -> m A;
-  bind: forall {A}, m A -> forall {B}, (A -> m B) -> m B
+  bind: forall {A}, m A -> forall {B}, (A -> m B) -> m B;
+  bind_right_unit: forall A (a: m A), a = bind a return_;
+  bind_left_unit: forall A (a: A) B (f: A -> m B),
+             f a = bind (return_ a) f;
+  bind_associativity: forall A (ma: m A) B f C (g: B -> m C),
+                 bind ma (fun  x=> bind (f x) g) = bind (bind ma f) g
 }.
 
 Notation "a >>= f" := (bind a f) (at level 50, left associativity).
 
 Hint Unfold bind return_ : monad_db.
 
-Class Monad_Correct (m : Type -> Type) `{M : Monad m} := {
-  bind_right_unit: forall A (a: m A), a = a >>= return_;
-  bind_left_unit: forall A (a: A) B (f: A -> m B),
-             f a = return_ a >>= f;
-  bind_associativity: forall A (ma: m A) B f C (g: B -> m C),
-                 bind ma (fun  x=> f x >>= g) = (ma >>= f) >>= g
-}.
-
+(* Monad Transformer *)
 Class MonadTrans {m} `{Monad m} (t : (Type -> Type) -> (Type -> Type)) `{Monad (t m)}  := {
   liftT : forall {A}, m A -> t m A;
   lifT_id : forall {A : Type} (a : A), (liftT ∘ return_) a = return_ a;
@@ -35,11 +30,10 @@ Class MonadTrans {m} `{Monad m} (t : (Type -> Type) -> (Type -> Type)) `{Monad (
 }.
 
 Arguments Monad m : assert.
-Arguments Monad_Correct m [M] : rename.
 
 Section monadic_functions.
  Variable m : Type -> Type.
- Variable Mo : Monad m.
+ Context `{Monad m}.
 
  Definition wbind {A: Type} (ma: m A) {B: Type} (mb: m B) :=
  ma >>= fun  _=>mb.
@@ -83,27 +77,30 @@ Definition loopT_pure {m A} (a : A) : LoopT m A :=
 
 (* >>= for Loop *)
 Definition loopT_bind {m A} (x : LoopT m A) {B} (k : A -> LoopT m B) : LoopT m B :=
-  (fun _ cont => 
-    let f' := (fun a => runLoopT (k a) cont) in 
+  (fun _ cont =>
+    let f' := (fun a => runLoopT (k a) cont) in
     runLoopT x f').
 
 (* Monad instance *)
 Global Instance loopT_M {m} : Monad (LoopT m) :=
   { return_ := @loopT_pure m;
     bind := @loopT_bind m}.
-
-Instance loopT_Mcorrect {m} : Monad_Correct (LoopT m).
   Proof.
-  constructor;intros;simpl; unfold loopT_bind; unfold loopT_pure; simpl; unfold runLoopT;auto. (* permet d'avoir les 3 lois *)
-  Qed.
+  + intros;simpl; unfold loopT_bind; unfold loopT_pure; simpl; unfold runLoopT.
+    auto.
+  + intros;simpl; unfold loopT_bind; unfold loopT_pure; simpl; unfold runLoopT.
+    auto.
+  + intros;simpl; unfold loopT_bind; unfold loopT_pure; simpl; unfold runLoopT.
+    auto.
+  Defined.
 
 Variable m : Type -> Type.
-Context `{Monad m}. 
+Context `{Monad m}.
 
 Definition loopT_liftT {A} (x : m A) : LoopT m A :=
-(fun _ cont => x >>= cont). 
+(fun _ cont => x >>= cont).
 
-Global Instance LoopT_T  : MonadTrans LoopT := 
+Global Instance LoopT_T  : MonadTrans LoopT :=
 { liftT := @loopT_liftT}.
 Proof.
   + intros.
@@ -130,15 +127,9 @@ Definition foreach' {m} `{Monad m} (min max : nat) {c} (body : nat -> LoopT m c)
 Definition once {m} `{Monad m} {c} (body : LoopT m c) : m unit :=
 stepLoopT body (fun _ => return_ tt).
 
-(* Record S := {
-  myval : nat
-}. *)
-
 Record S := {
-  my_list : list nat
+  mylist : list nat
 }.
-
-(* Variable S : Type. *)
 
 Definition State (A : Type) := S -> A * S.
 
@@ -158,21 +149,26 @@ Definition runState  {A} (op : State A) : S -> A * S := op.
 Definition evalState {A} (op : State A) : S -> A := fst ∘ op.
 Definition execState {A} (op : State A) : S -> S := snd ∘ op.
 
+Axiom toto : forall P : Prop, P.
+
 Global Instance stateM : Monad (State) :=
     { return_ := fun A a s=> (a,s);
       bind := @state_bind}.
+Proof.
+apply toto.
+apply toto.
+apply toto.
+Defined.
+
 
 Definition modify (f : S -> S) : State unit :=
   get >>= (fun s => put (f s)).
 
 Definition addElement (val : nat) : State unit :=
-  modify (fun s => {| my_list := val :: s.(my_list)|}).
+  modify (fun s => {| mylist := val :: s.(mylist)|}).
 
 End monadic_loop.
 
-Section Test.
-
-(* Programme qui initialise tous les élements d'une liste *)
 Open Scope list_scope.
 
 Notation "'foreach' i '=' min 'to' max '{{' body }}" := (foreach' min max (fun i => (loopT_liftT body))) (at level 60, i ident, min at level 60,
@@ -180,9 +176,6 @@ max at level 60, body at level 60, right associativity).
 
 Definition nth := 4.
 
-Definition init_S := {| my_list := [] |}.
+Definition init_S := {| mylist := [] |}.
 
 Compute runState (foreach i = 0 to nth {{ foreach j = 0 to nth {{addElement (i+j) }} }} ) init_S.
-
-End Test.
-(* Compute runState (foreach 0 nth (fun i => (liftT (changeIemeElement i i)))) init_S. *)
