@@ -68,31 +68,23 @@ End monadic_functions.
 
 Section monadic_loop.
 
-Inductive LoopT m c : Type
-  := MkLoopT : (forall (r : Type), (c -> m r) -> m r) -> LoopT m c.
+Definition LoopT m a : Type := (forall (r : Type), (a -> m r) -> m r).
 
-Arguments MkLoopT {_} {_} _.
-
-Check MkLoopT.
+Check LoopT.
 
 Definition runLoopT {m c r} : LoopT m c -> (c -> m r) -> m r :=
-  fun loop next =>
-    match loop with
-    | MkLoopT body => body r next
-    end.
+  fun loop next => loop r next.
 
 Arguments runLoopT {_} {_} {_}.
 
-Check runLoopT.
-
 (* pure for Loop *)
 Definition loopT_pure {m A} (a : A) : LoopT m A :=
-MkLoopT (fun _ cont => cont a).
+(fun _ cont => cont a).
 
 (* >>= for Loop *)
 Definition loopT_bind {m A} (x : LoopT m A) {B} (k : A -> LoopT m B) : LoopT m B :=
-  MkLoopT (fun _ cont =>
-    let f' := (fun a => runLoopT (k a) cont) in
+  (fun _ cont => 
+    let f' := (fun a => runLoopT (k a) cont) in 
     runLoopT x f').
 
 (* Monad instance *)
@@ -102,24 +94,20 @@ Global Instance loopT_M {m} : Monad (LoopT m) :=
 
 Instance loopT_Mcorrect {m} : Monad_Correct (LoopT m).
   Proof.
-  constructor;intros;simpl; unfold loopT_bind; unfold loopT_pure; simpl; unfold runLoopT. (* permet d'avoir les 3 lois *)
-  + case a.
-    auto.
-  + case (f a).
-    auto.
-  + case (ma).
-    auto.
+  constructor;intros;simpl; unfold loopT_bind; unfold loopT_pure; simpl; unfold runLoopT;auto. (* permet d'avoir les 3 lois *)
   Qed.
 
 Variable m : Type -> Type.
-Context `{Mo : Monad m}.
+Context `{Monad m}. 
 
 Definition loopT_liftT {A} (x : m A) : LoopT m A :=
- MkLoopT (fun _ cont => x >>= cont).
+(fun _ cont => x >>= cont). 
 
-Global Instance LoopT_T  : MonadTrans LoopT :=
+Global Instance LoopT_T  : MonadTrans LoopT := 
 { liftT := @loopT_liftT}.
 Proof.
+  + intros.
+    unfold loopT_liftT.
 Admitted.
 
 Import List.
