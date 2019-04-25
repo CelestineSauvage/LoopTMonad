@@ -34,8 +34,6 @@ Class MonadTrans {m} `{Monad m} (t : (Type -> Type) -> (Type -> Type)) `{Monad (
   lifT_bind : forall A B (ma : m A) (k : A -> m B), liftT (ma >>= k) = (liftT ma) >>= (liftT ∘ k)
 }.
 
-Check Monad_Correct.
-
 Arguments Monad m : assert.
 Arguments Monad_Correct m [M] : rename.
 
@@ -62,11 +60,6 @@ Section monadic_functions.
     apply functional_extensionality.
     auto.
   Qed.
-
-(* Monad Transformer *)
-Class MonadTrans {m} `{Monad m} (t : (Type -> Type) -> (Type -> Type)) `{Monad (t m)}  := {
-  liftT : forall {A}, m A -> t m A
-}.
 
 Notation "a >> f" := (wbind _ a f) (at level 50, left associativity).
 Notation "'perf' a <- e ; c" := (e >>= (fun  a => c)) (at level 60, right associativity).
