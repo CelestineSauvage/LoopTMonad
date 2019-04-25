@@ -1,7 +1,5 @@
 Require Import Program.
 
-Module Monad.
-
 Set Implicit Arguments.
 
 Import Notations.
@@ -18,9 +16,11 @@ Class Monad (m: Type -> Type) :=
                  bind ma (fun  x=> bind (f x) g) = bind (bind ma f) g
 }.
 
-Notation "a >>= f" := (bind a f) (at level 50, left associativity).
+Notation "a >>= f" := (bind a f) (at level 50, left associativity) : monad_scope.
 
-Hint Unfold bind return_ : monad_db.
+Open Scope monad_scope.
+
+(* Hint Unfold bind return_ : monad_db. *)
 
 (* Monad Transformer *)
 Class MonadTrans {m} `{Monad m} (t : (Type -> Type) -> (Type -> Type)) `{Monad (t m)}  := {
@@ -44,10 +44,10 @@ Section monadic_functions.
  Definition join {A: Type} (mma: m (m A)): m A :=
  mma >>= (fun  ma => ma).
 
-  Lemma bind_eq : forall {A B m} `{Monad m} (a a' : m A) (f f' : A -> m B),
-        a = a' ->
-        (forall x, f x = f' x) ->
-        bind a f = bind a' f'.
+Lemma bind_eq : forall {A B m} `{Monad m} (a a' : m A) (f f' : A -> m B),
+  a = a' ->
+  (forall x, f x = f' x) ->
+  bind a f = bind a' f'.
   Proof.
     intros. subst.
     f_equal.
@@ -55,29 +55,29 @@ Section monadic_functions.
     auto.
   Qed.
 
-(* Ltac simplify_monad_LHS :=
+(* Ltac cbnify_monad_LHS :=
   repeat match goal with
   | [ |- bind (return_ _) _ = _ ] => rewrite <- bind_left_unit
   | [ |- bind (bind _ _) _ = _ ]  => rewrite <- bind_associativity
   | [ |- _ = _ ]                  => reflexivity
   | [ |- bind ?a ?f = _ ]         => erewrite bind_eq; intros; 
-                                     [ | simplify_monad_LHS | simplify_monad_LHS ]
+                                     [ | cbnify_monad_LHS | cbnify_monad_LHS ]
   end.
 
-Ltac simplify_monad :=
-  simplify_monad_LHS;
+Ltac cbnify_monad :=
+  cbnify_monad_LHS;
   apply eq_sym;
-  simplify_monad_LHS;
+  cbnify_monad_LHS;
   apply eq_sym.
 
-Ltac simpl_m :=
+Ltac cbn_m :=
   repeat (try match goal with
   [ |- bind ?a _ = bind ?a _ ] => apply bind_eq; [ reflexivity | intros ]
-  end; simplify_monad).
- *)
+  end; cbnify_monad). *)
 
-Notation "a >> f" := (wbind _ a f) (at level 50, left associativity).
-Notation "'perf' a <- e ; c" := (e >>= (fun  a => c)) (at level 60, right associativity).
+
+(* Notation "a ;; f" := (wbind _ a f) (at level 60, right associativity) : monad_scope.
+Notation "'perf' a <- e ; c" := (e >>= (fun  a => c)) (at level 60, right associativity) : monad_scope. *)
 
 End monadic_functions.
 
@@ -114,7 +114,7 @@ Definition loopT_liftT {A} (x : m A) : LoopT m A :=
 Global Program Instance LoopT_T  : MonadTrans LoopT :=
 { liftT := @loopT_liftT}.
   Next Obligation.
-  intros;simpl.
+  intros;cbn.
   unfold loopT_liftT.
   unfold loopT_pure.
   extensionality r.
@@ -122,9 +122,17 @@ Global Program Instance LoopT_T  : MonadTrans LoopT :=
   rewrite <- bind_left_unit.
   reflexivity.
   Qed.
-  Next Obligation.
   
-  Admitted.
+  Next Obligation.
+  intros;cbn.
+  unfold loopT_liftT.
+  unfold loopT_bind.
+  unfold runLoopT.
+  extensionality r.
+  extensionality cont.
+  rewrite bind_associativity.
+  reflexivity.
+  Qed.
 
 Import List.
 
@@ -142,13 +150,18 @@ Definition foreach'' {m} `{Monad m} {a} (values : list a) {c} (body : a -> LoopT
 Definition foreach' {m} `{Monad m} (min max : nat) {c} (body : nat -> LoopT m c) : m unit :=
   foreach'' (seq min (max-min)) body.
 
+(* Notation "'foreach i '=' min 'to' max '{{' body }}" := (foreach' min max (fun i => (body))) (at level 60, i ident, min at level 60, 
+max at level 60, body at level 60, right associativity) : monad_scope. *)
+
 (* Fonction qui appelle une fois le corps de la boucle *)
 Definition once {m} `{Monad m} {c} (body : LoopT m c) : m unit :=
 stepLoopT body (fun _ => return_ tt).
 
-Record S := {
-  mylist : list nat
-}.
+End monadic_loop.
+
+Section monadic_state.
+
+Variable S : Type.
 
 Definition State (A : Type) := S -> A * S.
 
@@ -168,11 +181,10 @@ Definition runState  {A} (op : State A) : S -> A * S := op.
 Definition evalState {A} (op : State A) : S -> A := fst ∘ op.
 Definition execState {A} (op : State A) : S -> S := snd ∘ op.
 
-Program Instance stateM : Monad (State) :=
+Global Program Instance stateM : Monad (State) :=
     { return_ := fun A a s=> (a,s);
       bind := @state_bind}.
   Next Obligation.
-  Proof.
   intros.
   unfold state_bind.
   apply functional_extensionality.
@@ -190,22 +202,13 @@ Program Instance stateM : Monad (State) :=
   reflexivity.
   Qed.
 
-
 Definition modify (f : S -> S) : State unit :=
   get >>= (fun s => put (f s)).
 
-Definition addElement (val : nat) : State unit :=
-  modify (fun s => {| mylist := val :: s.(mylist)|}).
+End monadic_state.
 
-End monadic_loop.
-
-Open Scope list_scope.
-
+Notation "a ;; f" := (wbind _ a f) (at level 60, right associativity) : monad_scope.
+Notation "'perf' a <- e ; c" := (e >>= (fun  a => c)) (at level 60, right associativity) : monad_scope.
 Notation "'foreach' i '=' min 'to' max '{{' body }}" := (foreach' min max (fun i => (loopT_liftT body))) (at level 60, i ident, min at level 60,
 max at level 60, body at level 60, right associativity).
 
-Definition nth := 4.
-
-Definition init_S := {| mylist := [] |}.
-
-Compute runState (foreach i = 0 to nth {{ foreach j = 0 to nth {{addElement (i+j) }} }} ) init_S.
