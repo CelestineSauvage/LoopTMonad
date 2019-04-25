@@ -163,11 +163,11 @@ Definition modify (f : S -> S) : State unit :=
 Definition addElement (val : nat) : State unit :=
   modify (fun s => {| mylist := val :: s.(mylist)|}).
 
-(* End monadic_loop. *)
+End monadic_loop.
 
 Open Scope list_scope.
 
-Notation "'foreach' i '=' min 'to' max '{{' body }}" := (foreach' min max (fun i => (liftT body))) (at level 60, i ident, min at level 60, 
+Notation "'foreach' i '=' min 'to' max '{{' body }}" := (foreach' min max (fun i => (loopT_liftT body))) (at level 60, i ident, min at level 60, 
 max at level 60, body at level 60, right associativity).
 
 Definition nth := 4.
