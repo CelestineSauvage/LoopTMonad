@@ -55,6 +55,27 @@ Section monadic_functions.
     auto.
   Qed.
 
+(* Ltac simplify_monad_LHS :=
+  repeat match goal with
+  | [ |- bind (return_ _) _ = _ ] => rewrite <- bind_left_unit
+  | [ |- bind (bind _ _) _ = _ ]  => rewrite <- bind_associativity
+  | [ |- _ = _ ]                  => reflexivity
+  | [ |- bind ?a ?f = _ ]         => erewrite bind_eq; intros; 
+                                     [ | simplify_monad_LHS | simplify_monad_LHS ]
+  end.
+
+Ltac simplify_monad :=
+  simplify_monad_LHS;
+  apply eq_sym;
+  simplify_monad_LHS;
+  apply eq_sym.
+
+Ltac simpl_m :=
+  repeat (try match goal with
+  [ |- bind ?a _ = bind ?a _ ] => apply bind_eq; [ reflexivity | intros ]
+  end; simplify_monad).
+ *)
+
 Notation "a >> f" := (wbind _ a f) (at level 50, left associativity).
 Notation "'perf' a <- e ; c" := (e >>= (fun  a => c)) (at level 60, right associativity).
 
@@ -63,8 +84,6 @@ End monadic_functions.
 Section monadic_loop.
 
 Definition LoopT m a : Type := (forall (r : Type), (a -> m r) -> m r).
-
-Check LoopT.
 
 Definition runLoopT {m c r} : LoopT m c -> (c -> m r) -> m r :=
   fun loop next => loop r next.
@@ -103,8 +122,12 @@ Definition loopT_liftT {A} (x : m A) : LoopT m A :=
 Global Instance LoopT_T  : MonadTrans LoopT :=
 { liftT := @loopT_liftT}.
 Proof.
-  + intros.
+  + intros;simpl.
     unfold loopT_liftT.
+    unfold loopT_pure.
+    
+(*     apply functional_extensionality. *)
+    rewrite <- bind_left_unit.
 Admitted.
 
 Import List.
@@ -149,17 +172,25 @@ Definition runState  {A} (op : State A) : S -> A * S := op.
 Definition evalState {A} (op : State A) : S -> A := fst ∘ op.
 Definition execState {A} (op : State A) : S -> S := snd ∘ op.
 
-Axiom toto : forall P : Prop, P.
-
 Global Instance stateM : Monad (State) :=
     { return_ := fun A a s=> (a,s);
       bind := @state_bind}.
 Proof.
-apply toto.
-apply toto.
-apply toto.
++ intros.
+  unfold state_bind.
+  apply functional_extensionality.
+  intros.
+  destruct (a x).
+  reflexivity.
++ intros.
+  reflexivity.
++ intros.
+  unfold state_bind.
+  apply functional_extensionality.
+  intros.
+  destruct (ma x).
+  reflexivity.
 Defined.
-
 
 Definition modify (f : S -> S) : State unit :=
   get >>= (fun s => put (f s)).
