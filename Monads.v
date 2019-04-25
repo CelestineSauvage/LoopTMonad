@@ -101,17 +101,9 @@ Definition loopT_bind {m A} (x : LoopT m A) {B} (k : A -> LoopT m B) : LoopT m B
     runLoopT x f').
 
 (* Monad instance *)
-Global Instance loopT_M {m} : Monad (LoopT m) :=
+Global Program Instance loopT_M {m} : Monad (LoopT m) :=
   { return_ := @loopT_pure m;
     bind := @loopT_bind m}.
-  Proof.
-  + intros;simpl; unfold loopT_bind; unfold loopT_pure; simpl; unfold runLoopT.
-    auto.
-  + intros;simpl; unfold loopT_bind; unfold loopT_pure; simpl; unfold runLoopT.
-    auto.
-  + intros;simpl; unfold loopT_bind; unfold loopT_pure; simpl; unfold runLoopT.
-    auto.
-  Defined.
 
 Variable m : Type -> Type.
 Context `{Monad m}.
@@ -119,16 +111,20 @@ Context `{Monad m}.
 Definition loopT_liftT {A} (x : m A) : LoopT m A :=
 (fun _ cont => x >>= cont).
 
-Global Instance LoopT_T  : MonadTrans LoopT :=
+Global Program Instance LoopT_T  : MonadTrans LoopT :=
 { liftT := @loopT_liftT}.
-Proof.
-  + intros;simpl.
-    unfold loopT_liftT.
-    unfold loopT_pure.
-    
-(*     apply functional_extensionality. *)
-    rewrite <- bind_left_unit.
-Admitted.
+  Next Obligation.
+  intros;simpl.
+  unfold loopT_liftT.
+  unfold loopT_pure.
+  extensionality r.
+  extensionality cont.
+  rewrite <- bind_left_unit.
+  reflexivity.
+  Qed.
+  Next Obligation.
+  
+  Admitted.
 
 Import List.
 
@@ -172,25 +168,28 @@ Definition runState  {A} (op : State A) : S -> A * S := op.
 Definition evalState {A} (op : State A) : S -> A := fst ∘ op.
 Definition execState {A} (op : State A) : S -> S := snd ∘ op.
 
-Global Instance stateM : Monad (State) :=
+Program Instance stateM : Monad (State) :=
     { return_ := fun A a s=> (a,s);
       bind := @state_bind}.
-Proof.
-+ intros.
+  Next Obligation.
+  Proof.
+  intros.
   unfold state_bind.
   apply functional_extensionality.
   intros.
   destruct (a x).
   reflexivity.
-+ intros.
-  reflexivity.
-+ intros.
+  Qed.
+  
+  Next Obligation.
+  intros.
   unfold state_bind.
   apply functional_extensionality.
   intros.
   destruct (ma x).
   reflexivity.
-Defined.
+  Qed.
+
 
 Definition modify (f : S -> S) : State unit :=
   get >>= (fun s => put (f s)).
