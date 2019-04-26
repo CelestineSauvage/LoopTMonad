@@ -207,8 +207,8 @@ Definition modify (f : S -> S) : State unit :=
 
 End monadic_state.
 
-Notation "a ;; f" := (wbind _ a f) (at level 60, right associativity) : monad_scope.
-Notation "'perf' a <- e ; c" := (e >>= (fun  a => c)) (at level 60, right associativity) : monad_scope.
-Notation "'foreach' i '=' min 'to' max '{{' body }}" := (foreach' min max (fun i => (loopT_liftT body))) (at level 60, i ident, min at level 60,
-max at level 60, body at level 60, right associativity).
-
+Notation "m1 ;; m2" := (bind m1 (fun _ => m2))  (at level 60, right associativity) : monad_scope.
+Notation "'perf' x '<-' m ';' e" := (bind m (fun x => e))
+  (at level 60, x ident, m at level 200, e at level 60) : monad_scope.
+Notation "'for' i '=' min 'to' max '{{' body }}" := (foreach' min max (fun i => (loopT_liftT body))) (at level 60, i ident, min at level 60,
+max at level 60, body at level 60, right associativity) : monad_scope.

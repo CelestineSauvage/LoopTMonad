@@ -1,54 +1,58 @@
-Require Import Monads.
+Require Import Monads List.
 
 Open Scope monad_scope.
 
-Section Test1.
+Import ListNotations.
 
-Definition nth := 5.
+Set Implicit Arguments.
 
-Definition init_val := 0.
+Section Test.
 
-Definition init_S : nat := init_val.
+Definition nth1 := 5.
+
+Definition init_val1 := 0.
+
+Definition init_S1 : nat := init_val1.
 
 Definition add_s (i : nat) : Monads.State nat unit :=
   Monads.modify (fun s => s + i).
 
-Compute Monads.runState (foreach i = 0 to nth {{ add_s i }} ) init_S.
+Goal runState (for i = 0 to nth1 {{ add_s i }} ) init_S1 = (tt, 10).
+Proof.
+  unfold runState.
+  Admitted.
 
-End Test1.
+Compute runState (
+  for i = 0 to 5 {{
+    add_s i 
+  }} ;; 
+  for j = 0 to 5 
+  {{ 
+    add_s j 
+  }} ) init_S1.
 
-(* Open Scope list_scope.
+Definition getVal : State nat nat:= return_ 10.
 
-Notation "'foreach' i '=' min 'to' max '{{' body }}" := (foreach' min max (fun i => (liftT body))) (at level 60, i ident, min at level 60, 
-max at level 60, body at level 60, right associativity).
+Compute runState (
+  for i = 0 to 5 {{
+    add_s i 
+  }} ;; 
+  perf x <- getVal ;
+  add_s x ;;
+  for j = 0 to 5 
+  {{ 
+    add_s j 
+  }} ) init_S1.
 
-Definition nth := 4.
+Open Scope list_scope.
 
-Definition init_S := {| my_list := [] |}.
+Definition nth2 := 4.
 
-Definition addElement (val : nat) : State unit :=
-  modify (fun s => {| my_list := val :: s.(my_list)|}).
+Definition init_S2 : list nat := [].
 
-Compute runState (foreach i = 0 to nth {{ foreach j = 0 to nth {{addElement (i+j) }} }} ) init_S.
+Definition addElement (val : nat) : State (list nat) unit :=
+  modify (fun s => val :: s).
 
- *)
-(* End Monad. *)
-(* Definition init_val := 0.
+Compute runState (for i = 0 to nth2 {{ for j = 0 to nth2 {{addElement (i+j) }} }} ) init_S2.
 
-Definition init_S := {| myval := init_val|}.
-
-Definition changeState (i : nat) : State unit :=
-  modify (fun s => {| myval := s.(myval) + i |}).
-
-Check runState (foreach' 0 5 (fun i => (liftT (changeState i)))) init_S.
-
-(* Voir pour plus tard *)
-Notation "'foreach i '=' min 'to' max '{{' body }}" := (foreach' min max (fun i => (body))) (at level 60, i ident, min at level 60, 
-max at level 60, body at level 60, right associativity).
-
-(*  format "'[v' '[' 'foreach'  i  '='  min  'to'  max ']' '/' '[' '{{' body '}}' ']' ']'")  *)
-
-(* Compute runState (foreach i = 0 bip 5 {{liftT (changeState i)}} init_S. *)
-
-Compute runState (foreach' 0 5 (fun i => (liftT (changeState i)))) init_S.
- *)
+End Test.
