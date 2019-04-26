@@ -83,41 +83,51 @@ End monadic_functions.
 
 Section monadic_loop.
 
-Definition LoopT m a : Type := (forall (r : Type), (a -> m r) -> m r).
+Definition LoopT e m a : Type := (forall (r : Type), (e -> m r) -> (a -> m r) -> m r).
 
-Definition runLoopT {m c r} : LoopT m c -> (c -> m r) -> m r :=
-  fun loop next => loop r next.
+Definition runLoopT {m e a r} : LoopT e m a -> (e -> m r) -> (a -> m r) -> m r :=
+  fun loop exit next => loop r exit next.
 
-Arguments runLoopT {_} {_} {_}.
+Check runLoopT.
+
+Arguments runLoopT {_} {_} {_} {_}.
 
 (* pure for Loop *)
-Definition loopT_pure {m A} (a : A) : LoopT m A :=
-(fun _ cont => cont a).
+Definition loopT_pure {m e A} (a : A) : LoopT e m A :=
+  fun _ _ cont => cont a.
 
 (* >>= for Loop *)
-Definition loopT_bind {m A} (x : LoopT m A) {B} (k : A -> LoopT m B) : LoopT m B :=
-  (fun _ cont =>
-    let f' := (fun a => runLoopT (k a) cont) in
-    runLoopT x f').
+Definition loopT_bind {m e A} (x : LoopT e m A) {B} (k : A -> LoopT e m B) : LoopT e m B :=
+  (fun _ exit cont =>
+    let f' := (fun a => runLoopT (k a) exit cont) in
+    runLoopT x exit f').
+
+(* Variable m : Type -> Type.
+Variable e : Type. *)
+
+Check loopT_pure.
+Check loopT_bind.
 
 (* Monad instance *)
-Global Program Instance loopT_M {m} : Monad (LoopT m) :=
-  { return_ := @loopT_pure m;
-    bind := @loopT_bind m}.
+Global Program Instance loopT_M {e m} : Monad (LoopT e m) :=
+  { return_ := @loopT_pure m e;
+    bind := @loopT_bind m e}.
 
 Variable m : Type -> Type.
-Context `{Monad m}.
+Variable e: Type.
+Context `{Mo : Monad m}.
 
-Definition loopT_liftT {A} (x : m A) : LoopT m A :=
-(fun _ cont => x >>= cont).
+Definition loopT_liftT {A} (x : m A) : LoopT e m A :=
+(fun _ _ cont => x >>= cont).
 
-Global Program Instance LoopT_T  : MonadTrans LoopT :=
+Global Program Instance LoopT_T  : MonadTrans (LoopT e):=
 { liftT := @loopT_liftT}.
   Next Obligation.
   intros;cbn.
   unfold loopT_liftT.
   unfold loopT_pure.
   extensionality r.
+  extensionality exit.
   extensionality cont.
   rewrite <- bind_left_unit.
   reflexivity.
@@ -129,6 +139,7 @@ Global Program Instance LoopT_T  : MonadTrans LoopT :=
   unfold loopT_bind.
   unfold runLoopT.
   extensionality r.
+  extensionality exit.
   extensionality cont.
   rewrite bind_associativity.
   reflexivity.
@@ -136,25 +147,41 @@ Global Program Instance LoopT_T  : MonadTrans LoopT :=
 
 Import List.
 
-Definition stepLoopT {m} `{Monad m} {c} (body : LoopT m c) {r} (next : c -> m r) : m r :=
-  runLoopT body next.
+Definition stepLoopT {e m a} `{Mo : Monad m} (body : LoopT e m a) (next : a -> m e) : m e :=
+  runLoopT body (return_) next.
+
+(*   fun loop exit next => loop r exit next. *)
+(* Definition exitWith {m E a} (e : E): LoopT E m a :=
+  fun _ fin _ => fin e. *)
+
+(* Arguments exitWith {_} {_} {_}. *)
+
+Definition exit {m a} : LoopT unit m a :=
+  fun _ fin _ => fin tt.
+
+Arguments exit {_} {_}.
+
+Check exit.
+
+Definition when {m} `{Monad m} : bool -> m unit -> m unit :=
+  fun p s => if p then s else return_ tt. 
 
 (* Boucle qui prend une liste en paramètres et applique le corps de boucle pour chaque élement de la liste *)
-Definition foreach'' {m} `{Monad m} {a} (values : list a) {c} (body : a -> LoopT m c) : m unit :=
+Definition foreach'' {m} `{Monad m} {a} (values : list a) {c} (body : a -> LoopT unit m c) : m unit :=
   fold_right
     (fun x next => stepLoopT (body x) (fun _ => next))
     (return_ tt)
     values.
 
 (* Boucle avec un min et max qui appelle foreach' *)
-Definition foreach' {m} `{Monad m} (min max : nat) {c} (body : nat -> LoopT m c) : m unit :=
+Definition foreach' {m} `{Monad m} (min max : nat) {a} (body : nat -> LoopT unit m a) : m unit :=
   foreach'' (seq min (max-min)) body.
 
 (* Notation "'foreach i '=' min 'to' max '{{' body }}" := (foreach' min max (fun i => (body))) (at level 60, i ident, min at level 60, 
 max at level 60, body at level 60, right associativity) : monad_scope. *)
 
 (* Fonction qui appelle une fois le corps de la boucle *)
-Definition once {m} `{Monad m} {c} (body : LoopT m c) : m unit :=
+Definition once {m} `{Monad m} {a} (body : LoopT unit m a) : m unit :=
 stepLoopT body (fun _ => return_ tt).
 
 End monadic_loop.
@@ -211,4 +238,7 @@ Notation "m1 ;; m2" := (bind m1 (fun _ => m2))  (at level 60, right associativit
 Notation "'perf' x '<-' m ';' e" := (bind m (fun x => e))
   (at level 60, x ident, m at level 200, e at level 60) : monad_scope.
 Notation "'for' i '=' min 'to' max '{{' body }}" := (foreach' min max (fun i => (loopT_liftT body))) (at level 60, i ident, min at level 60,
+max at level 60, body at level 60, right associativity) : monad_scope.
+
+Notation "'fore' i '=' min 'to' max '{{' body }}" := (foreach' min max (fun i => (body))) (at level 60, i ident, min at level 60,
 max at level 60, body at level 60, right associativity) : monad_scope.

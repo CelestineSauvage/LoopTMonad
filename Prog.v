@@ -8,8 +8,6 @@ Set Implicit Arguments.
 
 Section Test.
 
-Definition nth1 := 5.
-
 Definition init_val1 := 0.
 
 Definition init_S1 : nat := init_val1.
@@ -20,10 +18,18 @@ Definition add_s (i : nat) : Monads.State nat unit :=
 Definition minus_s (i : nat) : Monads.State nat unit :=
   Monads.modify (fun s => s - i).
 
-Goal runState (for i = 0 to nth1 {{ add_s i }} ) init_S1 = (tt, 10).
-Proof.
-  unfold runState.
-  Admitted.
+Definition getVal : State nat nat:= return_ 10.
+
+Compute runState (
+  for i = 0 to 3 {{ 
+    add_s i ;;
+    add_s i ;;
+    perf x <- getVal;
+    add_s x ;;
+    add_s i ;;
+    add_s i
+  }} 
+  ) init_S1.
 
 Compute runState (
   for i = 0 to 5 {{
@@ -33,8 +39,6 @@ Compute runState (
   {{ 
     add_s j 
   }} ) init_S1.
-
-Definition getVal : State nat nat:= return_ 10.
 
 Compute runState (
   for i = 0 to 5 {{
@@ -58,11 +62,18 @@ Definition addElement (val : nat) : State (list nat) unit :=
 
 Compute runState (for i = 0 to nth2 {{ for j = 0 to nth2 {{addElement (i+j) }} }} ) init_S2.
 
-(* if/else *)
+(* exit *)
 
-Compute (Nat.eqb (Nat.modulo 9 2) 0).
+Compute runState (
+  fore i = 0 to 20 {{
+    if (i =? 5) then exit
+    else (loopT_liftT (add_s i))
+  }}
+  ) init_S1.
 
 Open Scope Z_scope.
+
+(* if/else *)
 
 Definition add_z (i : nat) : Monads.State Z unit :=
   Monads.modify (fun s => s + Z.of_nat i).
