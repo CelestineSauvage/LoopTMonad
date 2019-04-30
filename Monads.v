@@ -29,6 +29,33 @@ Class MonadTrans {m} `{Monad m} (t : (Type -> Type) -> (Type -> Type)) `{Monad (
   lifT_bind : forall A B (ma : m A) (k : A -> m B), liftT (ma >>= k) = (liftT ma) >>= (liftT ∘ k)
 }.
 
+(*
+HOARE 
+*)
+
+(* Assertion type *)
+Definition pre (s : Type) : Type := (s -> Prop).
+Definition post (a : Type) (s : Type) : Type := (a -> s -> Prop).
+
+(* Class HoareMonad {m} `{Monad m} :=
+{ run : forall {A : Type}, 
+  hoareTriple : forall {S A} (s : S) (P : S -> Prop) (Q : A -> S -> Prop), P s -> 
+
+}. *)
+
+Compute (fun n => n < 10) (5).
+
+(* Definition runLoopT {m e a r} (loop : LoopT e m a) : (e -> m r) -> (a -> m r) -> m r :=
+  fun exit next => loop r exit next.
+  
+  Definition runState  {A} (op : State A) : S -> A * S := op.
+   *)
+
+Class MonadHoare {A} {m} `{Monad m} : Prop := {
+  run : forall {A} (M : m A), M
+  triple := forall s, P s -> let (a,s') := m s in Q a s'
+}.
+
 Arguments Monad m : assert.
 
 Section monadic_functions.
@@ -85,8 +112,8 @@ Section monadic_loop.
 
 Definition LoopT e m a : Type := (forall (r : Type), (e -> m r) -> (a -> m r) -> m r).
 
-Definition runLoopT {m e a r} : LoopT e m a -> (e -> m r) -> (a -> m r) -> m r :=
-  fun loop exit next => loop r exit next.
+Definition runLoopT {m e a r} (loop : LoopT e m a) : (e -> m r) -> (a -> m r) -> m r :=
+  fun exit next => loop r exit next.
 
 Check runLoopT.
 
@@ -209,7 +236,7 @@ Definition evalState {A} (op : State A) : S -> A := fst ∘ op.
 Definition execState {A} (op : State A) : S -> S := snd ∘ op.
 
 Global Program Instance stateM : Monad (State) :=
-    { return_ := fun A a s=> (a,s);
+    { return_ := fun A a s => (a,s);
       bind := @state_bind}.
   Next Obligation.
   intros.
@@ -228,6 +255,10 @@ Global Program Instance stateM : Monad (State) :=
   destruct (ma x).
   reflexivity.
   Qed.
+
+
+Definition HoareTriple {A} (P : S -> Prop) (m : State A) (Q : A -> S -> Prop) : Prop :=
+  forall (s : S), P s -> let (a, s') := m s in Q a s'.
 
 Definition modify (f : S -> S) : State unit :=
   get >>= (fun s => put (f s)).
