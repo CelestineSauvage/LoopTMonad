@@ -22,75 +22,30 @@ Notation "a >>= f" := (bind a f) (at level 50, left associativity) : monad_scope
 
 Open Scope monad_scope.
 
-(*
-(* Arguments State [S]. *)
-
-Definition state_bind A (st_a : State A) B  (f : A -> State B) :=
-  fun  s => let (a,s) := st_a s in
-            f a s.
-
-Definition put (x : S) : State unit :=
-  fun _ => (tt,x).
-
-Definition get : State S :=
-  fun x => (x,x).
-
-Definition runState  {A} (op : State A) : S -> A * S := op.
-Definition evalState {A} (op : State A) : S -> A := fst ∘ op.
-Definition execState {A} (op : State A) : S -> S := snd ∘ op.
-
-Global Program Instance stateM : Monad (State) :=
-    { return_ := fun A a s => (a,s);
-      bind := @state_bind}. *)
-
-Variable S : Type.
-
-Class MonadState {m} `{Monad m} := {
-  get : m S;
-  put : S -> m unit;
-  run : forall {A}, m A -> S -> (A * S);
-  hoareTriple : forall {A} (ma : m A) (s : S )(P : S -> Prop) (Q : A -> S -> Prop), P s -> let (a, s') := (run ma s) in Q a s'
+Class MonadState (m: Type -> Type) `{Monad m} := {
+  get : forall S, m S;
+  put : forall S, S -> m unit;
+  run : forall {S A}, m A -> S -> (A * S);
+(*   hoareTriple : forall {A} (P : S -> Prop) (ma : m A) (Q : A -> S -> Prop) (s : S), P s -> let (a, s') := (run ma s) in Q a s' *)
 }.
-
-(* Hint Unfold bind return_ : monad_db. *)
 
 (* Monad Transformer *)
-Class MonadTrans {m} `{Monad m} (t : (Type -> Type) -> (Type -> Type)) `{Monad (t m)}  := {
+Class MonadTrans {m} `{MonadState m} (t : (Type -> Type) -> (Type -> Type)) `{Monad(t m)}  := {
+  (* Lift fonction and monade transformers laws *)
   liftT : forall {A}, m A -> t m A;
   lifT_id : forall {A : Type} (a : A), (liftT ∘ return_) a = return_ a;
-  lifT_bind : forall A B (ma : m A) (k : A -> m B), liftT (ma >>= k) = (liftT ma) >>= (liftT ∘ k)
-}.
-
-(*
-HOARE 
-*)
-
-(* Assertion type *)
-Definition pre (s : Type) : Type := (s -> Prop).
-Definition post (a : Type) (s : Type) : Type := (a -> s -> Prop).
-
-(* Class HoareMonad {m} `{Monad m} :=
-{ run : forall {A : Type}, 
-  hoareTriple : forall {S A} (s : S) (P : S -> Prop) (Q : A -> S -> Prop), P s -> 
-
-}. *)
-
-Compute (fun n => n < 10) (5).
-
-(* Definition runLoopT {m e a r} (loop : LoopT e m a) : (e -> m r) -> (a -> m r) -> m r :=
-  fun exit next => loop r exit next.
+  lifT_bind : forall A B (ma : m A) (k : A -> m B), liftT (ma >>= k) = (liftT ma) >>= (liftT ∘ k);
   
-  Definition runState  {A} (op : State A) : S -> A * S := op.
-   *)
-
-Class MonadHoare {A} {m} `{Monad m} : Prop := {
-  run : forall {A} (M : m A), M
-  triple := forall s, P s -> let (a,s') := m s in Q a s'
+  (* hoare triple *)
+ (*  getT : get *)
 }.
-
-Arguments Monad m : assert.
 
 End definition.
+
+
+Notation "a >>= f" := (bind a f) (at level 50, left associativity) : monad_scope.
+Open Scope monad_scope.
+Arguments Monad m : assert.
 
 Section monadic_functions.
  Variable m : Type -> Type.
@@ -136,11 +91,66 @@ Ltac cbn_m :=
   [ |- bind ?a _ = bind ?a _ ] => apply bind_eq; [ reflexivity | intros ]
   end; cbnify_monad). *)
 
-
-(* Notation "a ;; f" := (wbind _ a f) (at level 60, right associativity) : monad_scope.
-Notation "'perf' a <- e ; c" := (e >>= (fun  a => c)) (at level 60, right associativity) : monad_scope. *)
-
 End monadic_functions.
+
+Section monadic_state.
+
+Variable S : Type.
+
+Definition State (A : Type) := S -> A * S.
+
+(* Arguments State [S]. *)
+
+Definition state_bind A (st_a : State A) B  (f : A -> State B) :=
+  fun  s => let (a,s) := st_a s in
+            f a s.
+
+Definition putS (x : S) : State unit :=
+  fun _ => (tt,x).
+
+Definition getS : State S :=
+  fun x => (x,x).
+
+Definition runState  {A} (op : State A) : S -> A * S := op.
+(* Definition evalState {A} (op : State A) : S -> A := fst ∘ op. *)
+(* Definition execState {A} (op : State A) : S -> S := snd ∘ op. *)
+
+Global Program Instance stateM : Monad (State) :=
+    { return_ := fun A a s => (a,s);
+      bind := @state_bind}.
+  Next Obligation.
+  intros.
+  unfold state_bind.
+  apply functional_extensionality.
+  intros.
+  destruct (a x).
+  reflexivity.
+  Qed.
+  
+  Next Obligation.
+  intros.
+  unfold state_bind.
+  apply functional_extensionality.
+  intros.
+  destruct (ma x).
+  reflexivity.
+  Qed.
+
+Definition HoareTripleS {A} (P : S -> Prop) (m : State A) (Q : A -> S -> Prop) : Prop :=
+  forall (s : S), P s -> let (a, s') := m s in Q a s'.
+
+Global Instance stateS : MonadState (State) :=
+  {  get := @getS;
+    put := @putS;
+    run := @runState;
+  }.
+(*     hoareTriple : @ *)
+
+Definition modify (f : S -> S) : State unit :=
+  get >>= (fun s => put (f s)).
+
+End monadic_state.
+
 
 Section monadic_loop.
 
@@ -246,54 +256,6 @@ Definition once {m} `{Monad m} {a} (body : LoopT unit m a) : m unit :=
 stepLoopT body (fun _ => return_ tt).
 
 End monadic_loop.
-
-Section monadic_state.
-
-Variable S : Type.
-
-Definition State (A : Type) := S -> A * S.
-
-(* Arguments State [S]. *)
-
-Definition state_bind A (st_a : State A) B  (f : A -> State B) :=
-  fun  s => let (a,s) := st_a s in
-            f a s.
-
-Definition put (x : S) : State unit :=
-  fun _ => (tt,x).
-
-Definition get : State S :=
-  fun x => (x,x).
-
-Definition runState  {A} (op : State A) : S -> A * S := op.
-Definition evalState {A} (op : State A) : S -> A := fst ∘ op.
-Definition execState {A} (op : State A) : S -> S := snd ∘ op.
-
-Global Program Instance stateM : Monad (State) :=
-    { return_ := fun A a s => (a,s);
-      bind := @state_bind}.
-  Next Obligation.
-  intros.
-  unfold state_bind.
-  apply functional_extensionality.
-  intros.
-  destruct (a x).
-  reflexivity.
-  Qed.
-  
-  Next Obligation.
-  intros.
-  unfold state_bind.
-  apply functional_extensionality.
-  intros.
-  destruct (ma x).
-  reflexivity.
-  Qed.
-
-Definition modify (f : S -> S) : State unit :=
-  get >>= (fun s => put (f s)).
-
-End monadic_state.
 
 Notation "m1 ;; m2" := (bind m1 (fun _ => m2))  (at level 60, right associativity) : monad_scope.
 Notation "'perf' x '<-' m ';' e" := (bind m (fun x => e))
