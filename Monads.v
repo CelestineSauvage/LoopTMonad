@@ -6,6 +6,8 @@ Import Notations.
 
 Local Notation "f ∘ g" := (fun x => f (g x)) (at level 40, left associativity).
 
+Section definition.
+
 Class Monad (m: Type -> Type) :=
 { return_ : forall {A}, A -> m A;
   bind: forall {A}, m A -> forall {B}, (A -> m B) -> m B;
@@ -19,6 +21,36 @@ Class Monad (m: Type -> Type) :=
 Notation "a >>= f" := (bind a f) (at level 50, left associativity) : monad_scope.
 
 Open Scope monad_scope.
+
+(*
+(* Arguments State [S]. *)
+
+Definition state_bind A (st_a : State A) B  (f : A -> State B) :=
+  fun  s => let (a,s) := st_a s in
+            f a s.
+
+Definition put (x : S) : State unit :=
+  fun _ => (tt,x).
+
+Definition get : State S :=
+  fun x => (x,x).
+
+Definition runState  {A} (op : State A) : S -> A * S := op.
+Definition evalState {A} (op : State A) : S -> A := fst ∘ op.
+Definition execState {A} (op : State A) : S -> S := snd ∘ op.
+
+Global Program Instance stateM : Monad (State) :=
+    { return_ := fun A a s => (a,s);
+      bind := @state_bind}. *)
+
+Variable S : Type.
+
+Class MonadState {m} `{Monad m} := {
+  get : m S;
+  put : S -> m unit;
+  run : forall {A}, m A -> S -> (A * S);
+  hoareTriple : forall {A} (ma : m A) (s : S )(P : S -> Prop) (Q : A -> S -> Prop), P s -> let (a, s') := (run ma s) in Q a s'
+}.
 
 (* Hint Unfold bind return_ : monad_db. *)
 
@@ -57,6 +89,8 @@ Class MonadHoare {A} {m} `{Monad m} : Prop := {
 }.
 
 Arguments Monad m : assert.
+
+End definition.
 
 Section monadic_functions.
  Variable m : Type -> Type.
@@ -255,10 +289,6 @@ Global Program Instance stateM : Monad (State) :=
   destruct (ma x).
   reflexivity.
   Qed.
-
-
-Definition HoareTriple {A} (P : S -> Prop) (m : State A) (Q : A -> S -> Prop) : Prop :=
-  forall (s : S), P s -> let (a, s') := m s in Q a s'.
 
 Definition modify (f : S -> S) : State unit :=
   get >>= (fun s => put (f s)).
