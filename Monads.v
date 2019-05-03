@@ -22,15 +22,14 @@ Notation "a >>= f" := (bind a f) (at level 50, left associativity) : monad_scope
 
 Open Scope monad_scope.
 
-Class MonadState (m: Type -> Type) `{Monad m} := {
+(* Class MonadState (m: Type -> Type) `{Monad m} := {
   get : forall S, m S;
   put : forall S, S -> m unit;
-  run : forall {S A}, m A -> S -> (A * S);
+  run : forall {S A}, m A -> S -> (A * S); *)
 (*   hoareTriple : forall {A} (P : S -> Prop) (ma : m A) (Q : A -> S -> Prop) (s : S), P s -> let (a, s') := (run ma s) in Q a s' *)
-}.
 
 (* Monad Transformer *)
-Class MonadTrans {m} `{MonadState m} (t : (Type -> Type) -> (Type -> Type)) `{Monad(t m)}  := {
+Class MonadTrans {m} `{Monad m} (t : (Type -> Type) -> (Type -> Type)) `{Monad(t m)}  := {
   (* Lift fonction and monade transformers laws *)
   liftT : forall {A}, m A -> t m A;
   lifT_id : forall {A : Type} (a : A), (liftT ∘ return_) a = return_ a;
@@ -139,15 +138,15 @@ Global Program Instance stateM : Monad (State) :=
 Definition HoareTripleS {A} (P : S -> Prop) (m : State A) (Q : A -> S -> Prop) : Prop :=
   forall (s : S), P s -> let (a, s') := m s in Q a s'.
 
-Global Instance stateS : MonadState (State) :=
+(* Global Instance stateS : MonadState (State) :=
   {  get := @getS;
     put := @putS;
     run := @runState;
-  }.
+  }. *)
 (*     hoareTriple : @ *)
 
 Definition modify (f : S -> S) : State unit :=
-  get >>= (fun s => put (f s)).
+  getS >>= (fun s => putS (f s)).
 
 End monadic_state.
 
@@ -189,7 +188,7 @@ Variable e: Type.
 Context `{Mo : Monad m}.
 
 Definition loopT_liftT {A} (x : m A) : LoopT e m A :=
-(fun _ _ cont => x >>= cont).
+(fun _ _ cont => bind x cont).
 
 Global Program Instance LoopT_T  : MonadTrans (LoopT e):=
 { liftT := @loopT_liftT}.
@@ -227,7 +226,7 @@ Definition stepLoopT {e m a} `{Mo : Monad m} (body : LoopT e m a) (next : a -> m
 
 (* Arguments exitWith {_} {_} {_}. *)
 
-Definition exit {m a} : LoopT unit m a :=
+Definition exit {m a} `{Mo : Monad m}: LoopT unit m a :=
   fun _ fin _ => fin tt.
 
 Arguments exit {_} {_}.
