@@ -150,7 +150,6 @@ Definition modify (f : S -> S) : State unit :=
 
 End monadic_state.
 
-
 Section monadic_loop.
 
 Definition LoopT e m a : Type := (forall (r : Type), (e -> m r) -> (a -> m r) -> m r).
