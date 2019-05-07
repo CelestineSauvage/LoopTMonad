@@ -219,11 +219,12 @@ Notation "{[ P ]} m {[ Q ]}" := (HoareTriple_L P m Q)
 
 Check loopT_liftT.
 
-Lemma foreach_rule (min max : nat) (P : unit -> S -> Prop) (body : nat -> LoopT ())
-  : forall (it:nat) (s : S), (Nat.le min it) /\ (it < max) ->
-  {[P tt]} body it {[P]} -> {{P tt}} foreach' min max (body) {{P}} .
-Proof.
-Admitted.
+Lemma foreach_rule (min max : nat) (P : S -> Prop) (body : nat -> LoopT ())
+  : forall (it:nat), {[fun s => P s /\ (Nat.le min it) /\ (it < max)]} 
+  body it {[fun (_: unit) => P]} -> 
+  {{P}} foreach' min max (body) {{fun _ => P}} .
+  Proof.
+  Admitted.
 
 (* Set Implicit Arguments. *)
 
@@ -267,11 +268,13 @@ Definition count42 : State unit
     add_s i
   }} .
 
-Lemma l_count42 (P : unit -> S -> Prop) : 
- {{(fun s : S => P tt s)}} count42 {{(fun (u : unit ) (s : S) => P u s)}}.
+Lemma l_count42 : 
+ {{(fun s : S => val s <= 42)}} count42 {{(fun (u : unit ) (s : S) => val s <= 42)}}.
 Proof.
 unfold count42.
+intros s H.
 eapply foreach_rule.
+
 + admit.
 + admit.
 
