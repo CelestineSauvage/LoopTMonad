@@ -12,6 +12,8 @@ Definition init_val1 := 0.
 
 Definition init_S1 : nat := init_val1.
 
+Print modify.
+
 Definition add_s (i : nat) : Monads.State nat unit :=
   Monads.modify (fun s => s + i).
 
@@ -30,8 +32,6 @@ Definition count15 : State nat unit :=
 
 Notation "{{ P }} m {{ Q }}" := (hoareTripleS P m Q)
   (at level 90, format "'[' '[' {{  P  }}  ']' '/  ' '[' m ']' '['  {{  Q  }} ']' ']'") : monad_scope.
-
-SearchAbout Nat.add.
 
 Lemma l_add_s :
  forall (n i : nat), {{fun (s : nat) => s = n}} add_s i {{fun (_ : unit) (s : nat) => s = n + i}}.

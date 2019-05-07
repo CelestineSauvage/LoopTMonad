@@ -1,4 +1,4 @@
-Require Import Program Arith.
+Require Import Program ZArith.
 
 Set Implicit Arguments.
 
@@ -8,9 +8,9 @@ Local Notation "f ∘ g" := (fun x => f (g x)) (at level 40, left associativity)
 
 (* State Monad *)
 
-Section monads.
-
-Variable S : Type.
+Record S : Type:= {
+  val : nat
+}.
 
 Definition State (A : Type) := S -> A * S.
 
@@ -20,9 +20,15 @@ Definition State (A : Type) := S -> A * S.
 Definition state_pure A (a : A) : State A := 
   fun s => (a,s).
 
-Definition state_bind A (st_a : State A) B  (f : A -> State B) :=
+(* state_bind = 
+fun (A : Type) (st_a : State A) (B : Type) (f : A -> State B) (s : S) => let (a, s0) := st_a s in f a s0
+     : forall A : Type, State A -> forall B : Type, (A -> State B) -> S -> B * S *)
+Definition state_bind (A : Type) (st_a : State A) (B : Type) (f : A -> State B)  : State B :=
+  fun s => let (a, s0) := st_a s in f a s0.
+
+(* Definition state_bind A (st_a : State A) B (f : A -> State B) : State B :=
   fun  s => let (a,s) := st_a s in
-            f a s.
+            f a s. *)
 
 Definition put (x : S) : State () :=
   fun _ => (tt,x).
@@ -40,9 +46,15 @@ Notation "'perf' x '<-' m ';' e" := (state_bind m (fun x => e))
 
 Open Scope monad_scope.
 
+(* modify = 
+fun (S : Type) (f : S -> S) => perf s <- getS (S:=S); putS (f s)
+     : forall S : Type, (S -> S) -> State S () *)
+Definition modify (f : S -> S) : State () :=
+  perf s <- get; put (f s).
+
 Definition Assertion := S -> Prop.
 
-Definition hoareTripleS {A} (P : Assertion) (m : State A) (Q : A -> Assertion) : Prop :=
+Definition hoareTripleS {A} (P : S -> Prop) (m : State A) (Q : A -> S -> Prop) : Prop :=
   forall (s : S), P s -> let (a, s') := m s in Q a s'.
 
 Notation "{{ P }} m {{ Q }}" := (hoareTripleS P m Q)
@@ -95,9 +107,6 @@ Lemma assoc (A B C : Type)(m : State A)(f : A -> State B)(g : B -> State C) :
   extensionality s; unfold state_bind; case (m s); trivial; tauto.
   Qed.
 
-Definition modify (f : S -> S) : State () :=
-  perf s <- get ; put (f s).
-
 Lemma l_put (s : S) (P : unit -> Assertion) : {{ fun _ => P tt s }} put s {{ P }}.
 Proof.
 intros s0 H;trivial.
@@ -112,6 +121,28 @@ Lemma bindRev (A B : Type) (m : State A) (f : A -> State B) (P : Assertion)( Q :
   {{ P }} m {{ Q }} -> (forall a, {{ Q a }} f a {{ R }}) -> {{ P }} perf x <- m ; f x {{ R }}.
 Proof.
 intros; eapply bind ; eassumption.
+Qed.
+
+Lemma weaken (A : Type) (m : State A) (P Q : Assertion) (R : A -> Assertion) :
+  {{ Q }} m {{ R }} -> (forall s, P s -> Q s) -> {{ P }} m {{ R }}.
+Proof.
+intros H1 H2 s H3.
+apply H2 in H3. 
+apply H1 in H3.
+assumption. 
+Qed.
+
+Lemma l_modify f (P : () -> Assertion) : {{ fun s => P tt (f s) }} modify f {{ P }}.
+Proof.
+unfold modify.
+eapply bind.
+intros.
+eapply l_put.
+simpl.
+eapply weaken.
+eapply l_get.
+intros. simpl.
+assumption.
 Qed.
 
 (* End state_monad.
@@ -190,21 +221,65 @@ Check loopT_liftT.
 
 Lemma foreach_rule (min max : nat) (P : unit -> S -> Prop) (body : nat -> LoopT ())
   : forall (it:nat) (s : S), (Nat.le min it) /\ (it < max) ->
-  {[P tt]} body it {[P]} -> {{P tt}} foreach' min max (fun i => (body i)) {{P}} .
+  {[P tt]} body it {[P]} -> {{P tt}} foreach' min max (body) {{P}} .
+Proof.
+Admitted.
 
-End monads.
+(* Set Implicit Arguments. *)
 
-Set Implicit Arguments.
-
-Section Test.
+(* Section Test. *)
 
 Definition init_val1 := 0.
 
 Definition init_S1 : nat := init_val1.
 
 (* modify = 
-fun (S : Type) (f : S -> S) => getS (S:=S) >>= putS (S:=S) ∘ f
-     : forall S : Type, (S -> S) -> State S () *)
+fun (S : Type) (f : S -> S) => perf s <- getS (S:=S); putS (f s)
+     : forall S : Type, (S -> S) -> State S ()
+ *)
+Print modify.
 
-Definition add_s (i : nat) : State nat () :=
-  modify (fun s => s + i).
+Definition add_s (i : nat) : State unit :=
+  modify (fun s => {| val := s.(val) + i |}).
+
+Definition count15 : State unit :=
+ add_s 1;;
+ add_s 2;;
+ add_s 3;;
+ add_s 4;;
+ add_s 5;;
+ state_pure tt.
+
+Check (fun (s : S) => s.(val)).
+
+Lemma l_count15 : {{fun s : S => val s = init_S1}} count15 {{fun (_ : unit ) (s : S) => val s = 15}}.
+Admitted.
+
+Definition get10 : State nat:= state_pure 10.
+
+Definition count42 : State unit
+ := for i = 0 to 3 {{ 
+    add_s i ;;
+    add_s i ;;
+    perf x <- get10;
+    add_s x ;;
+    add_s i ;;
+    add_s i
+  }} .
+
+Lemma l_count42 (P : unit -> S -> Prop) : 
+ {{(fun s : S => P tt s)}} count42 {{(fun (u : unit ) (s : S) => P u s)}}.
+Proof.
+unfold count42.
+eapply foreach_rule.
++ admit.
++ admit.
+
+(* Lemma l_add_s :
+ forall (n i : nat), {{fun (s : S) => val s = n}} add_s i {{fun (_ : unit) (s : S) => val s = (n + i)}}.
+  Proof.
+  intros n i s H.
+  unfold add_s.
+  apply l_modify.
+  auto.
+  Qed. *)

@@ -115,6 +115,7 @@ Definition getS : State S :=
   fun x => (x,x).
 
 Definition runState  {A} (op : State A) : S -> A * S := op.
+
 (* Definition evalState {A} (op : State A) : S -> A := fst ∘ op. *)
 (* Definition execState {A} (op : State A) : S -> S := snd ∘ op. *)
 
@@ -138,6 +139,9 @@ Global Program Instance stateM : Monad (State) :=
   destruct (ma x).
   reflexivity.
   Qed.
+
+Definition modify (f : S -> S) : State () :=
+  getS >>= (fun s => putS (f s)).
 
 Definition Assertion := S -> Prop.
 
@@ -201,9 +205,6 @@ Lemma assoc (A B C : Type)(m : State A)(f : A -> State B)(g : B -> State C) :
   intros.
   reflexivity.
   Qed.
-
-Definition modify (f : S -> S) : State () :=
-  getS >>= (fun s => putS (f s)).
 
 Lemma l_put (s : S) (P : unit -> Assertion) : {{ fun _ => P tt s }} putS s {{ P }}.
 Proof.
