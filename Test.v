@@ -180,16 +180,17 @@ max at level 60, body at level 60, right associativity) : monad_scope.
 
 (* Au dessus de ma fonction foreach *)
 
-(* Definition HoareTriple_L {A B} (P : Assertion) (m : LoopT A) (Q : B -> Assertion) : Prop :=
-  forall (s : S) (next : A -> State B), P s -> let m' := (runLoopT m next) in let (b,s') := m' s in Q b s'. *)
+Definition HoareTriple_L {A B} (P : Assertion) (m : LoopT A) (Q : B -> Assertion) : Prop :=
+  forall (s : S) (next : A -> State B), P s -> let m' := (runLoopT m next) in let (b,s') := m' s in Q b s'.
 
-(* Notation "{{ P }} m {{ Q }}" := (hoareTripleS P m Q)
-  (at level 90, format "'[' '[' {{  P  }}  ']' '/  ' '[' m ']' '['  {{  Q  }} ']' ']'") : monad_scope. *)
+Notation "{[ P ]} m {[ Q ]}" := (HoareTriple_L P m Q)
+  (at level 90, format "'[' '[' {[  P  ]}  ']' '/  ' '[' m ']' '['  {[  Q  ]} ']' ']'") : monad_scope.
 
-Lemma foreach_rule
-  := forall (it:nat) (s : S), (Nat.le min it) /\ (it < max) -> 
-  stepLoopT (body it) (fun _s -> fun a let (a, s') := m 
-  in Q a s'.
+Check loopT_liftT.
+
+Lemma foreach_rule (min max : nat) (P : unit -> S -> Prop) (body : nat -> LoopT ())
+  : forall (it:nat) (s : S), (Nat.le min it) /\ (it < max) ->
+  {[P tt]} body it {[P]} -> {{P tt}} foreach' min max (fun i => (body i)) {{P}} .
 
 End monads.
 
