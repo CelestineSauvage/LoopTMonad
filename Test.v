@@ -132,6 +132,14 @@ apply H1 in H3.
 assumption. 
 Qed.
 
+Lemma strengthen (A : Type) (m : State A) (P: Assertion) (Q R: A -> Assertion) :
+  {{ P }} m {{ R }} -> (forall s a, R a s -> Q a s) -> {{ P }} m {{ Q }}.
+Proof.
+intros H1 H2 s H3.
+apply H1 in H3.
+Admitted.
+
+
 Lemma l_modify f (P : () -> Assertion) : {{ fun s => P tt (f s) }} modify f {{ P }}.
 Proof.
 unfold modify.
@@ -213,6 +221,13 @@ max at level 60, body at level 60, right associativity) : monad_scope.
 
 Definition HoareTriple_L {A B} (P : Assertion) (m : LoopT A) (Q : B -> Assertion) : Prop :=
   forall (s : S) (next : A -> State B), P s -> let m' := (runLoopT m next) in let (b,s') := m' s in Q b s'.
+(*   | For_E : 
+  | For_N : forall (s : S) (next : A -> State B), P s -> let m' := (stepLoopT m next) *)
+  
+
+(* Inductive foreach_L {A B} (P : Assertion) (m : LoopT A) (Q : B -> Assertion) : Prop :=
+  | For_E :
+  | For_N : forall A', HoareTriple_L P m Q ->  foreach_L P m Q -> foreach_L *)
 
 Notation "{[ P ]} m {[ Q ]}" := (HoareTriple_L P m Q)
   (at level 90, format "'[' '[' {[  P  ]}  ']' '/  ' '[' m ']' '['  {[  Q  ]} ']' ']'") : monad_scope.
@@ -224,6 +239,11 @@ Lemma foreach_rule (min max : nat) (P : S -> Prop) (body : nat -> LoopT ())
   body it {[fun (_: unit) => P]}) -> 
   {{P}} foreach' min max (body) {{fun _ => P}} .
   Proof.
+  intros.
+  unfold foreach'.
+  unfold foreach''.
+  unfold fold_right.
+  intros s H1.
   Admitted.
 
 (* Set Implicit Arguments. *)
@@ -267,11 +287,14 @@ Definition count42 : State unit
     add_s i ;;
     add_s i
   }} .
-
+  
 Lemma l_count42 : 
- {{(fun s : S => val s <= 42)}} count42 {{(fun (u : unit ) (s : S) => val s <= 42)}}.
+ {{(fun s : S => val s <= 42)}} count42 {{(fun (u : unit ) (s : S) => val s = 42)}}.
 Proof.
-unfold count42.
+eapply strengthen.
+eapply foreach_rule.
++ eapply weaken.
+unfold l.
 intros s H.
 eapply foreach_rule.
 

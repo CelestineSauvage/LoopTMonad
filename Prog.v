@@ -62,13 +62,23 @@ Definition count42 : State nat unit
     add_s i
   }} .
 
+Definition counti : State nat () :=
+   for i = 0 to 20 {{
+    (add_s i)
+  }}.
+
+Lemma l_counti : hoareTripleS (fun s : nat => s = init_S1) counti (fun (_ : unit ) (s : nat) => s = 42).
+  Proof.
+  eapply bindRev.
+  admit.
+
 Lemma l_count42 : hoareTripleS (fun s : nat => s = init_S1) count42 (fun (_ : unit ) (s : nat) => s = 42).
   Proof.
   eapply bindRev.
   unfold count42.
   unfold loopT_liftT.
   eapply bindRev.
-  Qed.
+  Admitted.
 
 Check count42.
 
@@ -89,7 +99,7 @@ Compute runState (
   for i = 0 to 5 {{
     add_s i 
   }} ;; 
-  perf x <- getVal ;
+  perf x <- get10 ;
   add_s x ;;
   for j = 0 to 5 
   {{ 
@@ -109,12 +119,16 @@ Compute runState (for i = 0 to nth2 {{ for j = 0 to nth2 {{addElement (i+j) }} }
 
 (* exit *)
 
-Compute runState (
-  fore i = 0 to 20 {{
+Definition test_exit : State nat () :=
+   for_e i = 0 to 20 {{
     if (i =? 5) then exit
     else (loopT_liftT (add_s i))
-  }}
-  ) init_S1.
+  }}.
+
+
+Lemma l_test_exit : hoareTripleS (fun s : nat => s = 0) test_exit (fun (_ : unit ) (s : nat) => s = 0).
+  Proof.
+  eapply bindRev.
 
 Open Scope Z_scope.
 

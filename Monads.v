@@ -325,15 +325,17 @@ Definition stepLoopT {e m a} `{Mo : Monad m} (body : LoopT e m a) (next : a -> m
 Definition HoareTriple_L {A S E} (P : S -> Prop) (m : LoopT E (State S) A) (Q : (E -> S -> Prop)) : Prop :=
   forall (s : S) (next : A -> State S E), P s -> let m' := (stepLoopT m next) in let (b,s') := m' s in Q b s'.
 
-Lemma foreach_rule {S} (P : S -> Prop) (m : LoopT E (State S) A) (Q : (E -> S -> Prop)
-  : forall (it:nat) (s : S), (Nat.le min it) /\ (it < max) -> 
+(* Lemma foreach_rule {S} (P : S -> Prop) (m : LoopT E (State S) A) (Q : (E -> S -> Prop)
+  : forall (it:nat) (s : S), (Nat.le min it) /\ (it < max) ->  *)
 
 (*   fun loop exit next => loop r exit next. *)
 (* Definition exitWith {m E a} (e : E): LoopT E m a :=
   fun _ fin _ => fin e. *)
+  
+Definition exit {m a} : LoopT unit m a :=
+  fun _ fin _ => fin tt.
 
-(* Arguments exitWith {_} {_} {_}. *)
-
+Arguments exit {_} {_}.
 
 Definition when {m} `{Monad m} : bool -> m unit -> m unit :=
   fun p s => if p then s else return_ tt. 
