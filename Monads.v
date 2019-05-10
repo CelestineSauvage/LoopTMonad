@@ -319,6 +319,7 @@ Global Program Instance LoopT_T  : MonadTrans (LoopT e):=
 
 Import List.
 
+
 Definition stepLoopT {e m a} `{Mo : Monad m} (body : LoopT e m a) (next : a -> m e) : m e :=
   runLoopT body (return_) next.
 

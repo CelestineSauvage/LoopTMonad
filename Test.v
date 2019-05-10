@@ -9,7 +9,7 @@ Local Notation "f ∘ g" := (fun x => f (g x)) (at level 40, left associativity)
 (* State Monad *)
 
 Record S : Type:= {
-  val : nat
+  r : nat
 }.
 
 Definition State (A : Type) := S -> A * S.
@@ -23,12 +23,8 @@ Definition state_pure A (a : A) : State A :=
 (* state_bind = 
 fun (A : Type) (st_a : State A) (B : Type) (f : A -> State B) (s : S) => let (a, s0) := st_a s in f a s0
      : forall A : Type, State A -> forall B : Type, (A -> State B) -> S -> B * S *)
-Definition state_bind (A : Type) (st_a : State A) (B : Type) (f : A -> State B)  : State B :=
+Definition state_bind {A B} (st_a : State A) (f : A -> State B)  : State B :=
   fun s => let (a, s0) := st_a s in f a s0.
-
-(* Definition state_bind A (st_a : State A) B (f : A -> State B) : State B :=
-  fun  s => let (a,s) := st_a s in
-            f a s. *)
 
 Definition put (x : S) : State () :=
   fun _ => (tt,x).
@@ -219,81 +215,71 @@ max at level 60, body at level 60, right associativity) : monad_scope.
 
 (* Au dessus de ma fonction foreach *)
 
-Definition HoareTriple_L {A B} (P : Assertion) (m : LoopT A) (Q : B -> Assertion) : Prop :=
+Definition hoareTripleL {A B} (P : Assertion) (m : LoopT A) (Q : B -> Assertion) : Prop := 
   forall (s : S) (next : A -> State B), P s -> let m' := (runLoopT m next) in let (b,s') := m' s in Q b s'.
-(*   | For_E : 
-  | For_N : forall (s : S) (next : A -> State B), P s -> let m' := (stepLoopT m next) *)
-  
+
+(* Lie une monade d'état à sa monade loop associée *)
+(* Inductive match_monad {A} : LoopT A -> State A -> Prop :=
+  |mklift : forall (mL : LoopT A) (mS : State A), loopT_liftT mS = mL -> match_monad mL mS.
+
+Lemma match_monad_spec {A} (mL : LoopT A) (mS : State A): 
+  loopT_liftT mS = mL -> match_monad mL mS.
+  Proof.
+  constructor.
+  assumption.
+  Qed. *)
 
 (* Inductive foreach_L {A B} (P : Assertion) (m : LoopT A) (Q : B -> Assertion) : Prop :=
   | For_E :
   | For_N : forall A', HoareTriple_L P m Q ->  foreach_L P m Q -> foreach_L *)
 
-Notation "{[ P ]} m {[ Q ]}" := (HoareTriple_L P m Q)
-  (at level 90, format "'[' '[' {[  P  ]}  ']' '/  ' '[' m ']' '['  {[  Q  ]} ']' ']'") : monad_scope.
+(* Notation "{[ P ]} m {[ Q ]}" := (hoareTripleL P m Q)
+  (at level 90, format "'[' '[' {[  P  ]}  ']' '/  ' '[' m ']' '['  {[  Q  ]} ']' ']'") : monad_scope. *)
 
-Check loopT_liftT.
-
-Lemma foreach_rule (min max : nat) (P : S -> Prop) (body : nat -> LoopT ())
-  : (forall (it:nat), {[fun s => P s /\ (Nat.le min it) /\ (it < max)]} 
-  body it {[fun (_: unit) => P]}) -> 
-  {{P}} foreach' min max (body) {{fun _ => P}} .
+Lemma foreach_rule (min max : nat) (P : S -> Prop) (m : nat -> State ())
+  : forall (it:nat), {{fun s => P s /\ (Nat.le min it) /\ (it < max)}} m it {{fun _ => P}}
+    -> {{P}} foreach' min max (fun it => loopT_liftT (m it)) {{fun _ => P}}.
   Proof.
-  intros.
-  unfold foreach'.
-  unfold foreach''.
-  unfold fold_right.
-  intros s H1.
   Admitted.
 
-(* Set Implicit Arguments. *)
-
-(* Section Test. *)
-
-Definition init_val1 := 0.
-
-Definition init_S1 : nat := init_val1.
-
-(* modify = 
-fun (S : Type) (f : S -> S) => perf s <- getS (S:=S); putS (f s)
-     : forall S : Type, (S -> S) -> State S ()
- *)
-Print modify.
+Definition init_state : S := {|r := 1|}.
 
 Definition add_s (i : nat) : State unit :=
-  modify (fun s => {| val := s.(val) + i |}).
+  modify (fun s => {| r := s.(r) + i |}).
 
-Definition count15 : State unit :=
- add_s 1;;
- add_s 2;;
- add_s 3;;
- add_s 4;;
- add_s 5;;
- state_pure tt.
+Definition mul_s (i : nat) : State unit :=
+  modify (fun s => {| r := s.(r) * i |}).
 
-Check (fun (s : S) => s.(val)).
+Definition fac5 : State unit :=
+  for i = 1 to 6 {{
+    mul_s i
+  }}.
 
-Lemma l_count15 : {{fun s : S => val s = init_S1}} count15 {{fun (_ : unit ) (s : S) => val s = 15}}.
-Admitted.
+Definition slow_add : State unit :=
+  for i = 0 to 6 {{
+    add_s 1
+  }}.
 
-Definition get10 : State nat:= state_pure 10.
+Compute runState slow_add init_state.
 
-Definition count42 : State unit
- := for i = 0 to 3 {{ 
-    add_s i ;;
-    add_s i ;;
-    perf x <- get10;
-    add_s x ;;
-    add_s i ;;
-    add_s i
-  }} .
-  
-Lemma l_count42 : 
- {{(fun s : S => val s <= 42)}} count42 {{(fun (u : unit ) (s : S) => val s = 42)}}.
+Lemma l_slow_add : 
+ {{(fun s : S => r s = 1)}} slow_add {{(fun (_ : unit ) (s : S) => r s = 7)}}.
 Proof.
 eapply strengthen.
 eapply foreach_rule.
 + eapply weaken.
+Admitted.
+
+Compute runState fac5 init_state.
+
+Lemma l_fac5 : 
+ {{(fun s : S => r s = 1)}} fac5 {{(fun (_ : unit ) (s : S) => r s = 120)}}.
+Proof.
+eapply strengthen.
+eapply foreach_rule.
++ intros.
+  
+  - eapply weaken.
 unfold l.
 intros s H.
 eapply foreach_rule.
