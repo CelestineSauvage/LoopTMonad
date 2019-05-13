@@ -233,8 +233,8 @@ Lemma match_monad_spec {A} (mL : LoopT A) (mS : State A):
   | For_E :
   | For_N : forall A', HoareTriple_L P m Q ->  foreach_L P m Q -> foreach_L *)
 
-(* Notation "{[ P ]} m {[ Q ]}" := (hoareTripleL P m Q)
-  (at level 90, format "'[' '[' {[  P  ]}  ']' '/  ' '[' m ']' '['  {[  Q  ]} ']' ']'") : monad_scope. *)
+Notation "{[ P ]} m {[ Q ]}" := (hoareTripleL P m Q)
+  (at level 90, format "'[' '[' {[  P  ]}  ']' '/  ' '[' m ']' '['  {[  Q  ]} ']' ']'") : monad_scope.
 
 Lemma foreach_rule (min max : nat) (P : S -> Prop) (m : nat -> State ())
   : forall (it:nat), {{fun s => P s /\ (Nat.le min it) /\ (it < max)}} m it {{fun _ => P}}
@@ -268,6 +268,7 @@ Proof.
 eapply strengthen.
 eapply foreach_rule.
 + eapply weaken.
+  - 
 Admitted.
 
 Compute runState fac5 init_state.
