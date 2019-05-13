@@ -53,13 +53,13 @@ Lemma l_count15 : {{fun s : nat => s = init_S1}} count15 {{fun (_ : unit ) (s : 
   Qed.
 
 Definition count42 : State nat unit
- := for i = 0 to 3 {{ 
-    add_s i ;;
-    add_s i ;;
+ := for j = 0 to 3 {{ 
+    add_s j ;;
+    add_s j ;;
     perf x <- get10;
     add_s x ;;
-    add_s i ;;
-    add_s i
+    add_s j ;;
+    add_s j
   }} .
 
 Definition counti : State nat () :=

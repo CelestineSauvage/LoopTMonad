@@ -236,16 +236,24 @@ Lemma match_monad_spec {A} (mL : LoopT A) (mS : State A):
 Notation "{[ P ]} m {[ Q ]}" := (hoareTripleL P m Q)
   (at level 90, format "'[' '[' {[  P  ]}  ']' '/  ' '[' m ']' '['  {[  Q  ]} ']' ']'") : monad_scope.
 
+(* Lemma state_to_loop (P : S -> Prop) (body : nat -> State ()) : 
+  forall (it:nat), {{fun s => P s /\ (min <= it) /\ (it < max)}} 
+  body it {[fun (_: unit) => P]} -> 	  body it {[fun (_: unit) => P]}) -> 
+  {{P}} foreach' min max (body) {{fun _ => P}} . *)
+
 Lemma foreach_rule (min max : nat) (P : S -> Prop) (m : nat -> State ())
-  : forall (it:nat), {{fun s => P s /\ (Nat.le min it) /\ (it < max)}} m it {{fun _ => P}}
-    -> {{P}} foreach' min max (fun it => loopT_liftT (m it)) {{fun _ => P}}.
+  : (forall (it:nat), {{fun s => P s /\ (min <= it < max)}} m it {{fun _ => P}}
+    -> {{P}} foreach' min max (fun it => loopT_liftT (m it)) {{fun _ => P}}).
   Proof.
   Admitted.
 
-Definition init_state : S := {|r := 1|}.
+Definition init_state : S := {|r := 0|}.
 
 Definition add_s (i : nat) : State unit :=
   modify (fun s => {| r := s.(r) + i |}).
+
+Definition min_s (i : nat) : State unit :=
+modify (fun s => {| r := s.(r) - i |}).
 
 Definition mul_s (i : nat) : State unit :=
   modify (fun s => {| r := s.(r) * i |}).
@@ -255,20 +263,37 @@ Definition fac5 : State unit :=
     mul_s i
   }}.
 
-Definition slow_add : State unit :=
-  for i = 0 to 6 {{
+Definition slow_add (m : nat) : State unit :=
+  for i = 0 to m {{
     add_s 1
   }}.
 
-Compute runState slow_add init_state.
+Compute runState (slow_add 7) init_state.
 
-Lemma l_slow_add : 
- {{(fun s : S => r s = 1)}} slow_add {{(fun (_ : unit ) (s : S) => r s = 7)}}.
+Lemma l_slow_add (n m : nat): 
+ {{(fun s : S => r s = n)}} slow_add m {{(fun (_ : unit ) (s : S) => r s = (Nat.add m n))}}.
 Proof.
 eapply strengthen.
+eapply weaken.
+unfold slow_add.
 eapply foreach_rule.
-+ eapply weaken.
-  - 
+2 : { intros.
+      assert (H2 : r s <= (n + m)).
+      - 
+      apply Nat.eq_le_incl in H.
+      eapply le_plus_trans.
+      trivial.
+      - apply H2. }
+cbn.
+unfold add_s.
+eapply weaken.
+apply l_modify.
+intros.
+simpl.
+trivial.
+  - intros.
+    simpl in H.
+    
 Admitted.
 
 Compute runState fac5 init_state.
@@ -277,6 +302,7 @@ Lemma l_fac5 :
  {{(fun s : S => r s = 1)}} fac5 {{(fun (_ : unit ) (s : S) => r s = 120)}}.
 Proof.
 eapply strengthen.
+unfold fac5.
 eapply foreach_rule.
 + intros.
   
