@@ -70,7 +70,7 @@ Definition counti : State nat () :=
 Lemma l_counti : hoareTripleS (fun s : nat => s = init_S1) counti (fun (_ : unit ) (s : nat) => s = 42).
   Proof.
   eapply bindRev.
-  admit.
+  Admitted.
 
 Lemma l_count42 : hoareTripleS (fun s : nat => s = init_S1) count42 (fun (_ : unit ) (s : nat) => s = 42).
   Proof.
@@ -129,6 +129,7 @@ Definition test_exit : State nat () :=
 Lemma l_test_exit : hoareTripleS (fun s : nat => s = 0) test_exit (fun (_ : unit ) (s : nat) => s = 0).
   Proof.
   eapply bindRev.
+  Admitted.
 
 Open Scope Z_scope.
 

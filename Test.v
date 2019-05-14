@@ -208,6 +208,9 @@ Definition foreach'(min max : nat) (body : nat -> LoopT ()) : State () :=
 Notation "'for' i '=' min 'to' max '{{' body }}" := (foreach' min max (fun i => (loopT_liftT body))) (at level 60, i ident, min at level 60,
 max at level 60, body at level 60, right associativity) : monad_scope.
 
+Notation "'for2' i '=' min 'to' max '{{' body }}" := (foreach' min max (fun i => (loopT_liftT body))) (at level 60, i ident, min at level 60,
+max at level 60, body at level 60, right associativity) : monad_scope.
+
 (* Definition LoopT a : Type := (forall (r : Type), (a -> State r) -> State r). *)
 
 (* Definition hoareTripleS {A} (P : S -> Prop) (m : State A) (Q : A -> S -> Prop) : Prop :=
@@ -216,13 +219,17 @@ max at level 60, body at level 60, right associativity) : monad_scope.
 (* Au dessus de ma fonction foreach *)
 
 Definition hoareTripleL {A B} (P : Assertion) (m : LoopT A) (Q : B -> Assertion) : Prop := 
-  forall (s : S) (next : A -> State B), P s -> let m' := (runLoopT m next) in let (b,s') := m' s in Q b s'.
+  forall (s : S) (next : A -> State B), P s -> let m' := (runLoopT m next) in
+   let (b,s') := m' s in Q b s'.
+
+Notation "{[ P ]} m {[ Q ]}" := (hoareTripleL P m Q)
+  (at level 90, format "'[' '[' {[  P  ]}  ']' '/  ' '[' m ']' '['  {[  Q  ]} ']' ']'") : monad_scope.
 
 (* Lie une monade d'état à sa monade loop associée *)
-(* Inductive match_monad {A} : LoopT A -> State A -> Prop :=
-  |mklift : forall (mL : LoopT A) (mS : State A), loopT_liftT mS = mL -> match_monad mL mS.
+(* Definition match_monad {A} : LoopT A -> State A -> Prop :=
+  forall (mL : LoopT A) (mS : State A), loopT_liftT mS = mL. *)
 
-Lemma match_monad_spec {A} (mL : LoopT A) (mS : State A): 
+(* Lemma match_monad_spec {A} (mL : LoopT A) (mS : State A): 
   loopT_liftT mS = mL -> match_monad mL mS.
   Proof.
   constructor.
@@ -236,16 +243,33 @@ Lemma match_monad_spec {A} (mL : LoopT A) (mS : State A):
 Notation "{[ P ]} m {[ Q ]}" := (hoareTripleL P m Q)
   (at level 90, format "'[' '[' {[  P  ]}  ']' '/  ' '[' m ']' '['  {[  Q  ]} ']' ']'") : monad_scope.
 
+Lemma loopT_to_state (P : S -> Prop) (Q : () -> S -> Prop) (mo : State ()) :
+  (forall mT : LoopT (), mT = loopT_liftT mo -> {{P}} mo {{Q}} -> 
+  {[P]} mT {[Q]}).
+  Proof.
+  
+  Admitted.
+
+Lemma foreach_rule (min max : nat) (P : S -> Prop) (body : nat -> LoopT ())
+  : (forall (it:nat), {[fun s => P s /\ (Nat.le min it) /\ (it < max)]} 
+  body it {[fun (_: unit) => P]}) -> 
+  {{P}} foreach' min max (body) {{fun _ => P}} .
+  Admitted.
+
 (* Lemma state_to_loop (P : S -> Prop) (body : nat -> State ()) : 
   forall (it:nat), {{fun s => P s /\ (min <= it) /\ (it < max)}} 
   body it {[fun (_: unit) => P]} -> 	  body it {[fun (_: unit) => P]}) -> 
   {{P}} foreach' min max (body) {{fun _ => P}} . *)
+(* 
+Lemma loopT_if_else {A} :
+  forall (m1 m2 : LoopT A),  *)
 
-Lemma foreach_rule (min max : nat) (P : S -> Prop) (m : nat -> State ())
+(* Lemma foreach_rule (min max : nat) (P : S -> Prop) (m : nat -> State ())
   : (forall (it:nat), {{fun s => P s /\ (min <= it < max)}} m it {{fun _ => P}}
-    -> {{P}} foreach' min max (fun it => loopT_liftT (m it)) {{fun _ => P}}).
+    -> {{P}}foreach' min max (fun it0 => loopT_liftT (m it0)) {{fun _ => P}}).
   Proof.
-  Admitted.
+  intros it.
+  Admitted. *)
 
 Definition init_state : S := {|r := 0|}.
 
@@ -268,6 +292,14 @@ Definition slow_add (m : nat) : State unit :=
     add_s 1
   }}.
 
+Definition slow_add2 (m : nat) : State unit :=
+  for i = 0 to m {{
+    if ((Nat.modulo i 2) =? 0) then
+      add_s 1
+    else
+      add_s 2
+  }}.
+
 Compute runState (slow_add 7) init_state.
 
 Lemma l_slow_add (n m : nat): 
@@ -277,6 +309,9 @@ eapply strengthen.
 eapply weaken.
 unfold slow_add.
 eapply foreach_rule.
++ intros. eapply loopT_to_state with (add_s 1).
+  - trivial.
+  - 
 2 : { intros.
       assert (H2 : r s <= (n + m)).
       - 
