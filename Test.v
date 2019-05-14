@@ -26,6 +26,45 @@ fun (A : Type) (st_a : State A) (B : Type) (f : A -> State B) (s : S) => let (a,
 Definition state_bind {A B} (st_a : State A) (f : A -> State B)  : State B :=
   fun s => let (a, s0) := st_a s in f a s0.
 
+
+(*    bind: forall {A}, m A -> forall {B}, (A -> m B) -> m B;
+  bind_right_unit: forall A (a: m A), a = bind a return_;
+  bind_left_unit: forall A (a: A) B (f: A -> m B),
+             f a = bind (return_ a) f;
+  bind_associativity: forall A (ma: m A) B f C (g: B -> m C),
+                 bind ma (fun  x=> bind (f x) g) = bind (bind ma f) g *)
+(* Lemma bind_right_unit *)
+
+Lemma state_bind_right_unit : 
+  forall (A : Type) (a: State A), a = state_bind a (@ state_pure A).
+  Proof.
+  intros.
+  unfold state_bind.
+  apply functional_extensionality.
+  intros.
+  destruct (a x).
+  reflexivity.
+  Qed.
+
+Lemma state_bind_left_unit :
+   forall A (a: A) B (f: A -> State B),
+             f a = state_bind (state_pure a) f.
+   Proof.
+   auto.
+   Qed.
+
+Lemma state_bind_associativity :
+  forall A (ma: State A) B f C (g: B -> State C),
+                 state_bind ma (fun x => state_bind (f x) g) = state_bind (state_bind ma f) g.
+  Proof.
+  intros.
+  unfold state_bind.
+  apply functional_extensionality.
+  intros.
+  destruct (ma x).
+  reflexivity.
+  Qed.
+
 Definition put (x : S) : State () :=
   fun _ => (tt,x).
 
@@ -170,11 +209,32 @@ Definition loopT_bind {A} (x : LoopT A) {B} (k : A -> LoopT B) : LoopT B :=
     let f' := (fun a => runLoopT (k a) next) in
     runLoopT x f').
 
-(* Variable m : Type -> Type. *)
-(* Variable e: Type. *)
+(*   bind_right_unit: forall A (a: m A), a = bind a return_;
+  bind_left_unit: forall A (a: A) B (f: A -> m B),
+             f a = bind (return_ a) f;
+  bind_associativity: forall A (ma: m A) B f C (g: B -> m C),
+                 bind ma (fun  x=> bind (f x) g) = bind (bind ma f) g *)
+Lemma loopT_bind_right_unit :
+  forall A (a : LoopT A), a = loopT_bind a loopT_pure.
+  Proof.
+  auto.
+  Qed.
+
+Lemma loopT_bind_left_unit :
+  forall A (a: A) B (f: A -> LoopT B),
+             f a = loopT_bind (loopT_pure a) f.
+  Proof.
+  auto.
+  Qed.
+
+Lemma loopT_bind_associativity :
+  forall A (ma: LoopT A) B f C (g: B -> LoopT C),
+                 loopT_bind ma (fun  x=> loopT_bind (f x) g) = loopT_bind (loopT_bind ma f) g.
+  Proof.
+  auto.
+  Qed.
 
 (* forall {A}, m A -> t m A; *)
-
 Definition loopT_liftT {A} (x : State A) : LoopT A :=
 (fun _ cont => state_bind x cont).
 
@@ -186,13 +246,36 @@ Definition stepLoopT {e a}  (body : LoopT e (State S) a) (next : a -> (State S) 
 Definition stepLoopT {a} (body : LoopT a) (next : a -> State ()) : State () :=
   runLoopT body next.
 
-(* exit = 
-fun (m : Type -> Type) (a : Type) (_ : Monad m) (r : Type) (fin : () -> m r)
-  (_ : a -> m r) => fin tt
-     : forall (m : Type -> Type) (a : Type), Monad m -> LoopT () m a *)
-(* 
-Definition exit {a}: LoopT () a :=
-  fun _ fin _ => fin tt. *)
+(* lifT_id : forall {A : Type} (a : A), (liftT ∘ return_) a = return_ a;
+lifT_bind : forall A B (ma : m A) (k : A -> m B), liftT (ma >>= k) = (liftT ma) >>= (liftT ∘ k); *)
+
+Lemma loopT_liftT_id :
+  forall {A : Type} (a : A), (loopT_liftT ∘ (@ state_pure A)) a = loopT_pure a.
+  Proof.
+  intros;cbn.
+  unfold loopT_liftT.
+  unfold loopT_pure.
+  extensionality r.
+  extensionality exit.
+  extensionality cont.
+  rewrite <- state_bind_left_unit.
+  reflexivity.
+  Qed.
+
+Lemma loopT_lifT_bind :
+  forall A B (ma : State A) (k : A -> State B), 
+      loopT_liftT (state_bind ma k) = loopT_bind (loopT_liftT ma) (loopT_liftT ∘ k).
+  Proof.
+  intros;cbn.
+  unfold loopT_liftT.
+  unfold loopT_bind.
+  unfold runLoopT.
+  extensionality r.
+  extensionality exit.
+  extensionality cont.
+  rewrite state_bind_associativity.
+  reflexivity.
+  Qed.
 
 Import List.
 
@@ -208,13 +291,8 @@ Definition foreach'(min max : nat) (body : nat -> LoopT ()) : State () :=
 Notation "'for' i '=' min 'to' max '{{' body }}" := (foreach' min max (fun i => (loopT_liftT body))) (at level 60, i ident, min at level 60,
 max at level 60, body at level 60, right associativity) : monad_scope.
 
-Notation "'for2' i '=' min 'to' max '{{' body }}" := (foreach' min max (fun i => (loopT_liftT body))) (at level 60, i ident, min at level 60,
+Notation "'for2' i '=' min 'to' max '{{' body }}" := (foreach' min max (fun i => (body))) (at level 60, i ident, min at level 60,
 max at level 60, body at level 60, right associativity) : monad_scope.
-
-(* Definition LoopT a : Type := (forall (r : Type), (a -> State r) -> State r). *)
-
-(* Definition hoareTripleS {A} (P : S -> Prop) (m : State A) (Q : A -> S -> Prop) : Prop :=
-  forall (s : S), P s -> let (a, s') := m s in Q a s'. *)
 
 (* Au dessus de ma fonction foreach *)
 
@@ -247,6 +325,17 @@ Lemma loopT_to_state (P : S -> Prop) (Q : () -> S -> Prop) (mo : State ()) :
   (forall mT : LoopT (), mT = loopT_liftT mo -> {{P}} mo {{Q}} -> 
   {[P]} mT {[Q]}).
   Proof.
+  intros.
+  rewrite H.
+  unfold loopT_liftT.
+  unfold state_bind.
+  unfold hoareTripleL.
+  intros.
+  unfold hoareTripleS in H0.
+  unfold runLoopT.
+  destruct (mo s).
+  case (next u s0).
+  intros.
   
   Admitted.
 
@@ -260,9 +349,6 @@ Lemma foreach_rule (min max : nat) (P : S -> Prop) (body : nat -> LoopT ())
   forall (it:nat), {{fun s => P s /\ (min <= it) /\ (it < max)}} 
   body it {[fun (_: unit) => P]} -> 	  body it {[fun (_: unit) => P]}) -> 
   {{P}} foreach' min max (body) {{fun _ => P}} . *)
-(* 
-Lemma loopT_if_else {A} :
-  forall (m1 m2 : LoopT A),  *)
 
 (* Lemma foreach_rule (min max : nat) (P : S -> Prop) (m : nat -> State ())
   : (forall (it:nat), {{fun s => P s /\ (min <= it < max)}} m it {{fun _ => P}}
@@ -309,9 +395,6 @@ eapply strengthen.
 eapply weaken.
 unfold slow_add.
 eapply foreach_rule.
-+ intros. eapply loopT_to_state with (add_s 1).
-  - trivial.
-  - 
 2 : { intros.
       assert (H2 : r s <= (n + m)).
       - 
@@ -319,7 +402,10 @@ eapply foreach_rule.
       eapply le_plus_trans.
       trivial.
       - apply H2. }
-cbn.
++ intros. eapply loopT_to_state with (add_s 1).
+  - trivial.
+  - admit. 
++ cbn.
 unfold add_s.
 eapply weaken.
 apply l_modify.
