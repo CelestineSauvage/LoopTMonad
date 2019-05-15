@@ -199,22 +199,11 @@ Definition LoopT a : Type := (a -> Action) -> Action.
 Definition loopT_pure {A} (a : A) : LoopT A :=
   fun (c : A -> Action) => c a.
 
-(* Definition loopT_bind {A} (x : LoopT A) {B} (k : A -> LoopT B) : LoopT B :=
-  (fun _ next =>
-    let f' := (fun a => runLoopT (k a) next) in
-    runLoopT x f'). *)
-
 Definition loopT_bind {A} (x : LoopT A) {B} (k : A -> LoopT B) : LoopT B :=
   fun (c : B -> Action) => x (fun a => (k a) c).
 
 Definition action {A} (x : LoopT A) : Action :=
-  x (fun a => Stop).
-
-(* Definition loopT_liftT {A} (x : State A) : LoopT A :=
-(fun _ cont => state_bind x cont). *)
-
-(* Definition loopT_fmap {m A B} (f : A -> B) (x : LoopT m A) : LoopT m B :=
-  MkLoopT (fun _ cont => runLoopT x (cont ∘ f)). *)
+  x (fun (_ : A) => Stop).
 
 (* lift *)
 Definition atom {A} (x : State A) : LoopT A := 
@@ -226,11 +215,24 @@ Fixpoint round (lst : list Action) : State () :=
   match lst with
     | nil => state_pure tt
     | (a::ax) => match a with 
-                  | Atom am => perf a' <- am ; round ax
-                  | Stop => round ax 
+                  | Atom am => am ;; round ax
+                  | Stop => round ax
                   end
     end.
 
 Definition run {A} (x : LoopT A) : State () :=
   round [action x].
 
+Definition stop {A} : LoopT A :=
+  fun c => Stop.
+
+(* Definition foreach''{v} (values : list v) {a} (body : v -> LoopT a) : State () :=
+  fold_right
+    (fun x next => stepLoopT (body x) (fun _ => next))
+    (state_pure tt)
+    values. *)
+
+Definition foreach (values : list nat) {a} (body : nat -> LoopT a) : list Action :=
+   match values with
+    | nil => 
+    | (v : vs) => action 
