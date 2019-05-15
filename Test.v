@@ -357,7 +357,7 @@ Lemma foreach_rule (min max : nat) (P : S -> Prop) (body : nat -> LoopT ())
   intros it.
   Admitted. *)
 
-Definition init_state : S := {|r := 0|}.
+Definition init_state : S := {|r := 1|}.
 
 Definition add_s (i : nat) : State unit :=
   modify (fun s => {| r := s.(r) + i |}).
@@ -372,6 +372,8 @@ Definition fac5 : State unit :=
   for i = 1 to 6 {{
     mul_s i
   }}.
+
+Compute runState fac5 init_state.
 
 Definition slow_add (m : nat) : State unit :=
   for i = 0 to m {{
@@ -388,7 +390,7 @@ Definition slow_add2 (m : nat) : State unit :=
 
 Compute runState (slow_add 7) init_state.
 
-Lemma l_slow_add (n m : nat): 
+(* Lemma l_slow_add (n m : nat): 
  {{(fun s : S => r s = n)}} slow_add m {{(fun (_ : unit ) (s : S) => r s = (Nat.add m n))}}.
 Proof.
 eapply strengthen.
@@ -415,7 +417,7 @@ trivial.
   - intros.
     simpl in H.
     
-Admitted.
+Admitted. *)
 
 Compute runState fac5 init_state.
 

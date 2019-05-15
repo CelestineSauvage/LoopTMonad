@@ -8,11 +8,11 @@ Local Notation "f ∘ g" := (fun x => f (g x)) (at level 40, left associativity)
 
 (* State Monad *)
 
-Record S : Type:= {
+Record St : Type:= {
   r : nat
 }.
 
-Definition State (A : Type) := S -> A * S.
+Definition State (A : Type) := St -> A * St.
 
 (* Arguments State [ A ]. *)
 
@@ -65,15 +65,15 @@ Lemma state_bind_associativity :
   reflexivity.
   Qed.
 
-Definition put (x : S) : State () :=
+Definition put (x : St) : State () :=
   fun _ => (tt,x).
 
-Definition get : State S :=
+Definition get : State St :=
   fun x => (x,x).
 
-Definition runState  {A} (op : State A) : S -> A * S := op.
-Definition evalState {A} (op : State A) : S -> A := fst ∘ op.
-Definition execState {A} (op : State A) : S -> S := snd ∘ op.
+Definition runState  {A} (op : State A) : St -> A * St := op.
+Definition evalState {A} (op : State A) : St -> A := fst ∘ op.
+Definition execState {A} (op : State A) : St -> St := snd ∘ op.
 
 Notation "m1 ;; m2" := (state_bind m1 (fun _ => m2))  (at level 60, right associativity) : monad_scope.
 Notation "'perf' x '<-' m ';' e" := (state_bind m (fun x => e))
@@ -84,13 +84,13 @@ Open Scope monad_scope.
 (* modify = 
 fun (S : Type) (f : S -> S) => perf s <- getS (S:=S); putS (f s)
      : forall S : Type, (S -> S) -> State S () *)
-Definition modify (f : S -> S) : State () :=
+Definition modify (f : St -> St) : State () :=
   perf s <- get; put (f s).
 
-Definition Assertion := S -> Prop.
+Definition Assertion := St -> Prop.
 
-Definition hoareTripleS {A} (P : S -> Prop) (m : State A) (Q : A -> S -> Prop) : Prop :=
-  forall (s : S), P s -> let (a, s') := m s in Q a s'.
+Definition hoareTripleS {A} (P : St -> Prop) (m : State A) (Q : A -> St -> Prop) : Prop :=
+  forall (s : St), P s -> let (a, s') := m s in Q a s'.
 
 Notation "{{ P }} m {{ Q }}" := (hoareTripleS P m Q)
   (at level 90, format "'[' '[' {{  P  }}  ']' '/  ' '[' m ']' '['  {{  Q  }} ']' ']'") : monad_scope.
@@ -113,10 +113,10 @@ case_eq (f a s0).
 intros b s'' H5.
 Admitted.
 
-Definition wp {A : Type} (P : A -> S -> Prop) (m : State A) :=
+Definition wp {A : Type} (P : A -> St -> Prop) (m : State A) :=
   fun s => let (a,s') := m s in P a s'.
 
-Lemma wpIsPrecondition {A : Type} (P : A -> S -> Prop) (m : State A) :
+Lemma wpIsPrecondition {A : Type} (P : A -> St -> Prop) (m : State A) :
   {{ wp P m }} m {{ P }}.
   Proof.
   unfold wp.
@@ -124,7 +124,7 @@ Lemma wpIsPrecondition {A : Type} (P : A -> S -> Prop) (m : State A) :
   Qed.
 
 Lemma wpIsWeakestPrecondition
-  (A : Type) (P : A -> S -> Prop) (Q : S -> Prop) (m : State A) :
+  (A : Type) (P : A -> St -> Prop) (Q : St -> Prop) (m : State A) :
   {{ Q }} m {{ P }} -> forall s, Q s -> (wp P m) s.
   Proof.
   trivial.
@@ -142,12 +142,12 @@ Lemma assoc (A B C : Type)(m : State A)(f : A -> State B)(g : B -> State C) :
   extensionality s; unfold state_bind; case (m s); trivial; tauto.
   Qed.
 
-Lemma l_put (s : S) (P : unit -> Assertion) : {{ fun _ => P tt s }} put s {{ P }}.
+Lemma l_put (s : St) (P : unit -> Assertion) : {{ fun _ => P tt s }} put s {{ P }}.
 Proof.
 intros s0 H;trivial.
 Qed.
 
-Lemma l_get (P : S -> Assertion) : {{ fun s => P s s }} get {{ P }}.
+Lemma l_get (P : St -> Assertion) : {{ fun s => P s s }} get {{ P }}.
 Proof.
 intros s H; trivial.
 Qed.
@@ -188,9 +188,12 @@ intros. simpl.
 assumption.
 Qed.
 
+Definition state_liftM {A B} (f : A -> B) (ma : State A) : State B :=
+  state_bind ma (fun a => state_pure (f a)).
+  
 (* Section Continuation. *)
 
-Inductive Action : Type :=
+(* Inductive Action : Type :=
   | Atom : State Action -> Action
   | Stop : Action.
 
@@ -224,15 +227,98 @@ Definition run {A} (x : LoopT A) : State () :=
   round [action x].
 
 Definition stop {A} : LoopT A :=
-  fun c => Stop.
+  fun c => Stop. *)
 
-(* Definition foreach''{v} (values : list v) {a} (body : v -> LoopT a) : State () :=
-  fold_right
-    (fun x next => stepLoopT (body x) (fun _ => next))
-    (state_pure tt)
-    values. *)
+Inductive Action (A : Type) : Type :=
+  | Break : Action A
+  | Atom : A -> Action A.
 
-Definition foreach (values : list nat) {a} (body : nat -> LoopT a) : list Action :=
-   match values with
-    | nil => 
-    | (v : vs) => action 
+Arguments Atom [A] _.
+Arguments Break [A].
+
+Inductive LoopT a : Type :=
+  |MkLoopT : State (Action a) -> LoopT a.
+
+Arguments MkLoopT {_} _.
+
+Definition runLoopT {A} (loop : LoopT A) : State (Action A) :=
+  match loop with
+   |MkLoopT x => x
+  end.
+
+Definition loopT_pure {A} (a : A) : LoopT A :=
+  MkLoopT (state_pure (Atom a)).
+
+Definition loopT_bind  {A} (x : LoopT A) {B} (k : A -> LoopT B) : LoopT B :=
+  MkLoopT ( 
+    perf o <- runLoopT x;
+    match o with 
+      | Break => state_pure Break
+      | Atom y => runLoopT (k y)
+    end).
+
+Definition loopT_liftT {A} (a : State A) : LoopT A :=
+  MkLoopT (state_liftM (@Atom A) a).
+
+Definition break {A} : LoopT A :=
+  MkLoopT (state_pure Break).
+
+Fixpoint foreach' (vals : list nat) (body : nat -> LoopT ()) : State () :=
+  match vals with
+    | nil => state_pure tt
+    | (it :: its) => perf out <- runLoopT (body it);
+                    match out with
+                      | Break => state_pure tt
+                      | _ => foreach' its body
+                    end
+  end.
+
+Definition foreach (min max : nat) (body : nat -> LoopT ()) : State () :=
+  foreach' (seq min (max-min)) body.
+
+Notation "'for' i '=' min 'to' max '{{' body }}" := (foreach min max (fun i => (loopT_liftT body))) (at level 60, i ident, min at level 60,
+max at level 60, body at level 60, right associativity) : monad_scope.
+
+Notation "'for_e' i '=' min 'to' max '{{' body }}" := (foreach min max (fun i => (body))) (at level 60, i ident, min at level 60,
+max at level 60, body at level 60, right associativity) : monad_scope.
+
+(* Notation "'for2' i '=' min 'to' max '{{' body }}" := (foreach min max (fun i => (body))) (at level 60, i ident, min at level 60,
+max at level 60, body at level 60, right associativity) : monad_scope. *)
+
+Definition init_state : St := {|r := 1|}.
+
+Definition add_s (i : nat) : State unit :=
+  modify (fun s => {| r := s.(r) + i |}).
+
+Definition min_s (i : nat) : State unit :=
+modify (fun s => {| r := s.(r) - i |}).
+
+Definition mul_s (i : nat) : State unit :=
+  modify (fun s => {| r := s.(r) * i |}).
+
+Definition fac5 : State unit :=
+  for i = 1 to 6 {{
+    mul_s i
+  }}.
+
+Definition test_exit : State () :=
+   for_e i = 0 to 20 {{
+    if (i =? 5) then break
+    else (loopT_liftT (add_s 1))
+  }}.
+
+Compute runState test_exit init_state. 
+
+Lemma foreach_rule (min max : nat) (P : () -> St -> Prop) (body : nat -> State ())
+  : (forall (it : nat) (m_vals : list nat), (m_vals = (seq min (max-min)) /\ 
+  {{fun s => P tt s /\ (Nat.le min it) /\ (it < max)}} 
+      body it {{P}}) -> 
+    {{P tt}} foreach' m_vals (fun _ => loopT_liftT (body it)) {{P}}).
+  Proof.
+  intros i l [H1 H2].
+  unfold foreach'.
+  induction l.
+  + apply ret.
+  + eapply bindRev .
+    - unfold runLoopT.
+      case (loopT_liftT (body i)).
