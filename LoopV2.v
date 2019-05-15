@@ -107,11 +107,12 @@ Proof.
 intros H1 H2 s H3.
 unfold state_bind.
 case_eq (m s).
-intros.
+intros a s' H4.
 apply H2 in H3.
-case_eq (f a s0).
-intros b s'' H5.
-Admitted.
+rewrite H4 in H3.
+apply H1.
+apply H3.
+Qed.
 
 Definition wp {A : Type} (P : A -> St -> Prop) (m : State A) :=
   fun s => let (a,s') := m s in P a s'.
@@ -236,32 +237,26 @@ Inductive Action (A : Type) : Type :=
 Arguments Atom [A] _.
 Arguments Break [A].
 
-Inductive LoopT a : Type :=
-  |MkLoopT : State (Action a) -> LoopT a.
-
-Arguments MkLoopT {_} _.
+Definition LoopT a : Type := State (Action a).
 
 Definition runLoopT {A} (loop : LoopT A) : State (Action A) :=
-  match loop with
-   |MkLoopT x => x
-  end.
+  loop.
 
 Definition loopT_pure {A} (a : A) : LoopT A :=
-  MkLoopT (state_pure (Atom a)).
+  (state_pure (Atom a)).
 
 Definition loopT_bind  {A} (x : LoopT A) {B} (k : A -> LoopT B) : LoopT B :=
-  MkLoopT ( 
     perf o <- runLoopT x;
     match o with 
       | Break => state_pure Break
       | Atom y => runLoopT (k y)
-    end).
+    end.
 
 Definition loopT_liftT {A} (a : State A) : LoopT A :=
-  MkLoopT (state_liftM (@Atom A) a).
+  state_liftM (@Atom A) a.
 
 Definition break {A} : LoopT A :=
-  MkLoopT (state_pure Break).
+  state_pure Break.
 
 Fixpoint foreach' (vals : list nat) (body : nat -> LoopT ()) : State () :=
   match vals with
@@ -301,6 +296,8 @@ Definition fac5 : State unit :=
     mul_s i
   }}.
 
+Compute runState fac5 init_state. 
+
 Definition test_exit : State () :=
    for_e i = 0 to 20 {{
     if (i =? 5) then break
@@ -311,14 +308,17 @@ Compute runState test_exit init_state.
 
 Lemma foreach_rule (min max : nat) (P : () -> St -> Prop) (body : nat -> State ())
   : (forall (it : nat) (m_vals : list nat), (m_vals = (seq min (max-min)) /\ 
-  {{fun s => P tt s /\ (Nat.le min it) /\ (it < max)}} 
+  {{fun s => P tt s /\ (min <= it < max)}} 
       body it {{P}}) -> 
-    {{P tt}} foreach' m_vals (fun _ => loopT_liftT (body it)) {{P}}).
+    {{P tt}} foreach' m_vals (fun _ => loopT_liftT (body it)) {{fun _ s => P tt s /\ ~(min <= it < max)}}).
   Proof.
-  intros i l [H1 H2].
+  intros i l [H1 H2] st HP.
+  unfold hoareTripleS in H2.
   unfold foreach'.
   induction l.
   + apply ret.
   + eapply bindRev .
     - unfold runLoopT.
-      case (loopT_liftT (body i)).
+      unfold loopT_liftT.
+      unfold state_liftM.
+      
