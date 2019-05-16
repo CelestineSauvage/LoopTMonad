@@ -1,4 +1,4 @@
-Require Import Program List ZArith.
+Require Import Program List ZArith Arith.
 
 Set Implicit Arguments.
 
@@ -243,6 +243,11 @@ Proof.
 intros s H; trivial.
 Qed.
 
+(* Lemma ret_tt (P : () -> Assertion) : {{ P tt }} state_pure tt {{ P }}.
+Proof.
+intros s H; trivial.
+Qed. *)
+
 Arguments Atom [A] _.
 Arguments Break [A].
 
@@ -315,15 +320,17 @@ Definition test_exit : State () :=
 
 Compute runState test_exit init_state. 
 
+(* in_seq: forall len start n : nat, In n (seq start len) <-> start <= n < start + len *)
 Lemma foreach_rule (min max : nat) (P : () -> St -> Prop) (body : nat -> State ())
-  : (forall (it : nat) (m_vals : list nat), (m_vals = (seq min (max-min)) /\ 
+  : (forall (it : nat) (m_vals : list nat), 
+  (min <= max /\ m_vals = (seq min (max-min)) /\ In it m_vals /\
   {{fun s => P tt s /\ (min <= it < max)}} 
       body it {{P}}) -> 
     {{P tt}} foreach' m_vals (fun _ => loopT_liftT (body it)) {{fun _ s => P tt s}}).
   Proof.
-  intros i l [H1 H2] st HP.
+  intros i l [H1 [H2 [H3 H4]]] st HP.
 (*   unfold hoareTripleS in H2. *)
-  unfold foreach'.
+(*   unfold foreach'. *)
   induction l.
   + auto.
   + eapply bindRev .
@@ -331,7 +338,20 @@ Lemma foreach_rule (min max : nat) (P : () -> St -> Prop) (body : nat -> State (
       unfold loopT_liftT.
       unfold state_liftM.
       eapply bindRev.
-      * eapply H2.
+      * eapply H4.
       * intros [].
         apply act_ret.
-    - 
+    - intros [].
+      * intros [].
+        apply ret.
+      * intros s Hp'.
+        unfold foreach' in IHl.
+(*         apply IHl. *)
+        admit.
+    - simpl.
+      split.
+      * apply HP.
+      * rewrite H2 in H3.
+        rewrite in_seq in H3.
+        rewrite <- le_plus_minus in H3;auto.
+     Qed.
