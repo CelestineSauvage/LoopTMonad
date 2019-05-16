@@ -235,8 +235,8 @@ Lemma loopT_bind_associativity :
   Qed.
 
 (* forall {A}, m A -> t m A; *)
-Definition loopT_liftT {A} (x : State A) : LoopT A :=
-(fun _ cont => state_bind x cont).
+Definition loopT_liftT {A} (m : State A) : LoopT A :=
+(fun _ cont => state_bind m cont).
 
 (* Variable S : Type.
 
@@ -297,8 +297,7 @@ max at level 60, body at level 60, right associativity) : monad_scope.
 (* Au dessus de ma fonction foreach *)
 
 Definition hoareTripleL {A B} (P : Assertion) (m : LoopT A) (Q : B -> Assertion) : Prop := 
-  forall (s : S) (next : A -> State B), P s -> let m' := (runLoopT m next) in
-   let (b,s') := m' s in Q b s'.
+  forall (s : S) (next : A -> State B), P s -> let m' := (runLoopT m next) in {{P}} m' {{Q}}.
 
 Notation "{[ P ]} m {[ Q ]}" := (hoareTripleL P m Q)
   (at level 90, format "'[' '[' {[  P  ]}  ']' '/  ' '[' m ']' '['  {[  Q  ]} ']' ']'") : monad_scope.
@@ -318,9 +317,6 @@ Notation "{[ P ]} m {[ Q ]}" := (hoareTripleL P m Q)
   | For_E :
   | For_N : forall A', HoareTriple_L P m Q ->  foreach_L P m Q -> foreach_L *)
 
-Notation "{[ P ]} m {[ Q ]}" := (hoareTripleL P m Q)
-  (at level 90, format "'[' '[' {[  P  ]}  ']' '/  ' '[' m ']' '['  {[  Q  ]} ']' ']'") : monad_scope.
-
 Lemma loopT_to_state (P : S -> Prop) (Q : () -> S -> Prop) (mo : State ()) :
   (forall mT : LoopT (), mT = loopT_liftT mo -> {{P}} mo {{Q}} -> 
   {[P]} mT {[Q]}).
@@ -329,9 +325,12 @@ Lemma loopT_to_state (P : S -> Prop) (Q : () -> S -> Prop) (mo : State ()) :
   rewrite H.
   unfold loopT_liftT.
   unfold state_bind.
-  unfold hoareTripleL.
-  intros.
+  intros s next Hp.
   unfold hoareTripleS in H0.
+  intros.
+  simpl.
+  case_eq (m', s).
+  intros.
   unfold runLoopT.
   destruct (mo s).
   case (next u s0).
