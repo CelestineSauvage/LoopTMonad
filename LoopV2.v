@@ -272,25 +272,25 @@ Definition loopT_liftT {A} (a : State A) : LoopT A :=
 Definition break {A} : LoopT A :=
   state_pure Break.
 
-Fixpoint foreach' (it : nat) (body : nat -> LoopT ()) : State () :=
+Fixpoint foreach (it : nat) (body : nat -> LoopT ()) : State () :=
   match it with
   | 0 => state_pure tt
   | S it' => perf out <- runLoopT (body it);
                     match out with
                       | Break => state_pure tt
-                      | _ => foreach' it' body
+                      | _ => foreach it' body
                     end
  end.
 
 (* Definition foreach (min max : nat) (body : nat -> LoopT ()) : State () :=
   foreach' (seq min (max-min)) body. *)
 
-Notation "'for' i '=' min 'to' max '{{' body }}" := (foreach min max (fun i => (loopT_liftT body))) (at level 60, i ident, min at level 60,
+Notation "'for' i '=' max {{' body }}" := (foreach max (fun i => (loopT_liftT body))) (at level 60, i ident,
 max at level 60, body at level 60, right associativity) : monad_scope.
 
-Notation "'for_e' i '=' min 'to' max '{{' body }}" := (foreach min max (fun i => (body))) (at level 60, i ident, min at level 60,
+(* Notation "'for_e' i '=' min 'to' max '{{' body }}" := (foreach min max (fun i => (body))) (at level 60, i ident, min at level 60,
 max at level 60, body at level 60, right associativity) : monad_scope.
-
+ *)
 (* Notation "'for2' i '=' min 'to' max '{{' body }}" := (foreach min max (fun i => (body))) (at level 60, i ident, min at level 60,
 max at level 60, body at level 60, right associativity) : monad_scope. *)
 
@@ -305,53 +305,59 @@ modify (fun s => {| r := s.(r) - i |}).
 Definition mul_s (i : nat) : State unit :=
   modify (fun s => {| r := s.(r) * i |}).
 
-Definition fac5 : State unit :=
-  for i = 1 to 6 {{
+(* Definition fac5 : State unit :=
+  for i = 5 to 0 {{
     mul_s i
   }}.
+ *)
+(* Compute runState fac5 init_state.  *)
 
-Compute runState fac5 init_state. 
-
-Definition test_exit : State () :=
+(* Definition test_exit : State () :=
    for_e i = 0 to 20 {{
     if (i =? 5) then break
     else (loopT_liftT (add_s 1))
   }}.
+ *)
+(* Compute runState test_exit init_state.  *)
 
-Compute runState test_exit init_state. 
-
-SearchPattern (In _ _ -> In _ _).
+SearchPattern (0 <= _).
 (* in_seq: forall len start n : nat, In n (seq start len) <-> start <= n < start + len *)
-Lemma foreach_rule (min max : nat) (P : () -> St -> Prop) (body : nat -> State ())
-  : (forall (it : nat) (m_vals : list nat), 
-  (min <= max /\ m_vals = (seq min (max-min)) /\ In it m_vals /\
-  {{fun s => P tt s /\ (min <= it < max)}} 
-      body it {{P}}) -> 
-    {{P tt}} foreach' m_vals (fun _ => loopT_liftT (body it)) {{fun _ s => P tt s}}).
+Lemma foreach_rule (max : nat) (P : () -> St -> Prop) (body : nat -> State ())
+  : forall (it : nat), ((max <= it) /\ {{fun s => P tt s /\ (0 <= it <= max)}} body it {{P}}) -> 
+    {{P tt}} foreach max (fun _ => loopT_liftT (body it)) {{fun _ s => P tt s}}.
   Proof.
-  intros i l [H1 [H2 [H3 H4]]].
+  intros i [H H3].
+(*   intros i l [H1 [H2 [H3 H4]]]. *)
 (*   unfold hoareTripleS in H2. *)
 (*   unfold foreach'. *)
-  induction l.
-  + intros st H. auto.
+  induction max.
+  + intros st HP. auto.
   + eapply bindRev .
     - unfold runLoopT.
       unfold loopT_liftT.
       unfold state_liftM.
       eapply bindRev.
-      * intros st H. eapply H4.
+      * intros st H2. eapply weaken.
+        apply H3.
+      intros st HP. admit. (* eapply H2.
         split.
         apply H.
-        rewrite H2 in H3.
-        rewrite in_seq in H3.
-        rewrite <- le_plus_minus in H3;auto.
+        split;auto.
+        apply Nat.le_0_l. *)
       * intros [].
         apply act_ret.
-    - intros [].
-      * intros [].
-        apply ret.
-      * apply IHl.
-         ++ admit.
+   - intros [].
+    * intros s HP. 
+      apply ret.
+      apply HP.
+    * apply IHmax.
+         ++ intros s'.
+            intros [H1 H2].
+            apply H.
+            split. apply H1.
+            split.
+            SearchPattern (_ <= S _ -> _ <= _).
+          admit.
          ++ apply in_cons with nat a i l in H3.
          destruct H2. 
             trivial.
