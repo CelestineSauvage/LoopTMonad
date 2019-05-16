@@ -234,6 +234,15 @@ Inductive Action (A : Type) : Type :=
   | Break : Action A
   | Atom : A -> Action A.
 
+(* Definition hoareTripleS {A} (P : St -> Prop) (m : State A) (Q : A -> St -> Prop) : Prop :=
+  forall (s : St), P s -> let (a, s') := m s in Q a s'. *)
+
+Lemma act_ret  (A : Type) (a : A) (P : A -> Assertion) : {{ P a }} state_pure (Atom a) 
+{{fun (_ : Action A) =>  P a }}.
+Proof.
+intros s H; trivial.
+Qed.
+
 Arguments Atom [A] _.
 Arguments Break [A].
 
@@ -310,15 +319,19 @@ Lemma foreach_rule (min max : nat) (P : () -> St -> Prop) (body : nat -> State (
   : (forall (it : nat) (m_vals : list nat), (m_vals = (seq min (max-min)) /\ 
   {{fun s => P tt s /\ (min <= it < max)}} 
       body it {{P}}) -> 
-    {{P tt}} foreach' m_vals (fun _ => loopT_liftT (body it)) {{fun _ s => P tt s /\ ~(min <= it < max)}}).
+    {{P tt}} foreach' m_vals (fun _ => loopT_liftT (body it)) {{fun _ s => P tt s}}).
   Proof.
   intros i l [H1 H2] st HP.
-  unfold hoareTripleS in H2.
+(*   unfold hoareTripleS in H2. *)
   unfold foreach'.
   induction l.
-  + apply ret.
+  + auto.
   + eapply bindRev .
     - unfold runLoopT.
       unfold loopT_liftT.
       unfold state_liftM.
-      
+      eapply bindRev.
+      * eapply H2.
+      * intros [].
+        apply act_ret.
+    - 
