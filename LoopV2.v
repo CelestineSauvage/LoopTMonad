@@ -320,6 +320,7 @@ Definition test_exit : State () :=
 
 Compute runState test_exit init_state. 
 
+SearchPattern (In _ _ -> In _ _).
 (* in_seq: forall len start n : nat, In n (seq start len) <-> start <= n < start + len *)
 Lemma foreach_rule (min max : nat) (P : () -> St -> Prop) (body : nat -> State ())
   : (forall (it : nat) (m_vals : list nat), 
@@ -328,26 +329,33 @@ Lemma foreach_rule (min max : nat) (P : () -> St -> Prop) (body : nat -> State (
       body it {{P}}) -> 
     {{P tt}} foreach' m_vals (fun _ => loopT_liftT (body it)) {{fun _ s => P tt s}}).
   Proof.
-  intros i l [H1 [H2 [H3 H4]]] st HP.
+  intros i l [H1 [H2 [H3 H4]]].
 (*   unfold hoareTripleS in H2. *)
 (*   unfold foreach'. *)
   induction l.
-  + auto.
+  + intros st H. auto.
   + eapply bindRev .
     - unfold runLoopT.
       unfold loopT_liftT.
       unfold state_liftM.
       eapply bindRev.
-      * eapply H4.
+      * intros st H. eapply H4.
+        split.
+        apply H.
+        rewrite H2 in H3.
+        rewrite in_seq in H3.
+        rewrite <- le_plus_minus in H3;auto.
       * intros [].
         apply act_ret.
     - intros [].
       * intros [].
         apply ret.
-      * intros s Hp'.
-        unfold foreach' in IHl.
+      * apply IHl.
+         ++ admit.
+         ++ apply in_cons with nat a i l in H3.
+         destruct H2. 
+            trivial.
 (*         apply IHl. *)
-        admit.
     - simpl.
       split.
       * apply HP.
