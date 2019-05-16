@@ -272,18 +272,18 @@ Definition loopT_liftT {A} (a : State A) : LoopT A :=
 Definition break {A} : LoopT A :=
   state_pure Break.
 
-Fixpoint foreach' (vals : list nat) (body : nat -> LoopT ()) : State () :=
-  match vals with
-    | nil => state_pure tt
-    | (it :: its) => perf out <- runLoopT (body it);
+Fixpoint foreach' (it : nat) (body : nat -> LoopT ()) : State () :=
+  match it with
+  | 0 => state_pure tt
+  | S it' => perf out <- runLoopT (body it);
                     match out with
                       | Break => state_pure tt
-                      | _ => foreach' its body
+                      | _ => foreach' it' body
                     end
-  end.
+ end.
 
-Definition foreach (min max : nat) (body : nat -> LoopT ()) : State () :=
-  foreach' (seq min (max-min)) body.
+(* Definition foreach (min max : nat) (body : nat -> LoopT ()) : State () :=
+  foreach' (seq min (max-min)) body. *)
 
 Notation "'for' i '=' min 'to' max '{{' body }}" := (foreach min max (fun i => (loopT_liftT body))) (at level 60, i ident, min at level 60,
 max at level 60, body at level 60, right associativity) : monad_scope.
