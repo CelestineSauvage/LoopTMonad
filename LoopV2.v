@@ -320,16 +320,12 @@ Definition mul_s (i : nat) : State unit :=
  *)
 (* Compute runState test_exit init_state.  *)
 
-SearchPattern (0 <= _).
 (* in_seq: forall len start n : nat, In n (seq start len) <-> start <= n < start + len *)
 Lemma foreach_rule (max : nat) (P : () -> St -> Prop) (body : nat -> State ())
-  : forall (it : nat), ((max <= it) /\ {{fun s => P tt s /\ (0 <= it <= max)}} body it {{P}}) -> 
-    {{P tt}} foreach max (fun _ => loopT_liftT (body it)) {{fun _ s => P tt s}}.
+  : (forall (it : nat), {{fun s => P tt s /\ (0 <= it <= max)}} body it {{P}}) -> 
+    {{P tt}} foreach max (fun it0 => loopT_liftT (body it0)) {{fun _ s => P tt s}}.
   Proof.
-  intros i [H H3].
-(*   intros i l [H1 [H2 [H3 H4]]]. *)
-(*   unfold hoareTripleS in H2. *)
-(*   unfold foreach'. *)
+  intros H.
   induction max.
   + intros st HP. auto.
   + eapply bindRev .
@@ -337,13 +333,10 @@ Lemma foreach_rule (max : nat) (P : () -> St -> Prop) (body : nat -> State ())
       unfold loopT_liftT.
       unfold state_liftM.
       eapply bindRev.
-      * intros st H2. eapply weaken.
-        apply H3.
-      intros st HP. admit. (* eapply H2.
-        split.
-        apply H.
+      * intros st H2.
+        eapply H;split;auto.
         split;auto.
-        apply Nat.le_0_l. *)
+        apply Nat.le_0_l.
       * intros [].
         apply act_ret.
    - intros [].
@@ -351,14 +344,11 @@ Lemma foreach_rule (max : nat) (P : () -> St -> Prop) (body : nat -> State ())
       apply ret.
       apply HP.
     * apply IHmax.
-         ++ intros s'.
-            intros [H1 H2].
+         ++ intros it s'.
+            intros [H1 [H2 H3]].
             apply H.
-            split. apply H1.
-            split.
-            SearchPattern (_ <= S _ -> _ <= _).
-          admit.
-         ++ apply in_cons with nat a i l in H3.
+            split;auto.
+         (* ++ apply in_cons with nat a i l in H3.
          destruct H2. 
             trivial.
 (*         apply IHl. *)
@@ -367,5 +357,5 @@ Lemma foreach_rule (max : nat) (P : () -> St -> Prop) (body : nat -> State ())
       * apply HP.
       * rewrite H2 in H3.
         rewrite in_seq in H3.
-        rewrite <- le_plus_minus in H3;auto.
+        rewrite <- le_plus_minus in H3;auto. *)
      Qed.
