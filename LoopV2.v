@@ -272,20 +272,18 @@ Definition loopT_liftT {A} (a : State A) : LoopT A :=
 Definition break {A} : LoopT A :=
   state_pure Break.
 
-Fixpoint foreach (it : nat) (body : nat -> LoopT ()) : State () :=
-  match it with
-  | 0 => state_pure tt
-  | S it' => perf out <- runLoopT (body it);
-                    match out with
-                      | Break => state_pure tt
-                      | _ => foreach it' body
-                    end
- end.
+Program Fixpoint foreach (it min : nat) (body : nat -> LoopT ()) : State () :=
+  if (Nat.leb it min) then state_pure tt
+  else match it with
+        | S it' => perf out <- runLoopT (body it);
+                                match out with
+                                  | Break => state_pure tt
+                                  | _ => foreach it' min body
+                                end
+        | 0 => state_pure tt
+       end.
 
-(* Definition foreach (min max : nat) (body : nat -> LoopT ()) : State () :=
-  foreach' (seq min (max-min)) body. *)
-
-Notation "'for' i '=' max {{' body }}" := (foreach max (fun i => (loopT_liftT body))) (at level 60, i ident,
+Notation "'for' i '=' min 'to' max '{{' body }}" := (foreach min max (fun i => (loopT_liftT body))) (at level 60, i ident, min at level 60,
 max at level 60, body at level 60, right associativity) : monad_scope.
 
 (* Notation "'for_e' i '=' min 'to' max '{{' body }}" := (foreach min max (fun i => (body))) (at level 60, i ident, min at level 60,
@@ -321,37 +319,42 @@ Definition mul_s (i : nat) : State unit :=
 (* Compute runState test_exit init_state.  *)
 
 (* in_seq: forall len start n : nat, In n (seq start len) <-> start <= n < start + len *)
-Lemma foreach_rule (max : nat) (P : () -> St -> Prop) (body : nat -> State ())
-  : (forall (it : nat), {{fun s => P tt s /\ (0 <= it <= max)}} body it {{P}}) -> 
-    {{P tt}} foreach max (fun it0 => loopT_liftT (body it0)) {{fun _ s => P tt s}}.
+Lemma foreach_rule (min max : nat) (P : () -> St -> Prop) (body : nat -> State ())
+  : (forall (it : nat), {{fun s => P tt s /\ (min <= it <= max)}} body it {{P}}) -> 
+    {{P tt}} foreach max min (fun it0 => loopT_liftT (body it0)) {{fun _ s => P tt s}}.
   Proof.
   intros H.
   induction max.
   + intros st HP. auto.
-  + eapply bindRev .
-    - unfold runLoopT.
+  + unfold foreach.
+    case_eq (S max <=? min);intros Hm.
+    - intros s HP. trivial.
+    - eapply bindRev .
+      unfold runLoopT.
       unfold loopT_liftT.
       unfold state_liftM.
       eapply bindRev.
-      * intros st H2.
+      * unfold hoareTripleS in H.
+        intros st H2.
         eapply H;split;auto.
         split;auto.
-        apply Nat.le_0_l.
+        apply Nat.leb_gt in Hm.
+        apply Nat.lt_le_incl.
+        auto.
       * intros [].
         apply act_ret.
-   - intros [].
-    * intros s HP. 
-      apply ret.
-      apply HP.
-    * apply IHmax.
+    * intros []. intros s HP. trivial.
+      apply IHmax.
          ++ intros it s'.
             intros [H1 [H2 H3]].
             apply H.
             split;auto.
      Qed.
 
-Definition slow_add : State unit :=
-  foreach 10 (fun _ => loopT_liftT (add_s 1)).
+Definition slow_add (m : nat) : State unit :=
+  for i = 0 to m {{
+    add_s 1
+  }}.
 
 Lemma l_slow_add (n : nat): 
  {{(fun s : St => r s = n)}} slow_add {{(fun (_ : unit ) (s : St) => r s = (Nat.add 10 n))}}.
