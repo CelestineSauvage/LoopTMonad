@@ -348,14 +348,15 @@ Lemma foreach_rule (max : nat) (P : () -> St -> Prop) (body : nat -> State ())
             intros [H1 [H2 H3]].
             apply H.
             split;auto.
-         (* ++ apply in_cons with nat a i l in H3.
-         destruct H2. 
-            trivial.
-(*         apply IHl. *)
-    - simpl.
-      split.
-      * apply HP.
-      * rewrite H2 in H3.
-        rewrite in_seq in H3.
-        rewrite <- le_plus_minus in H3;auto. *)
      Qed.
+
+Definition slow_add : State unit :=
+  foreach 10 (fun _ => loopT_liftT (add_s 1)).
+
+Lemma l_slow_add (n : nat): 
+ {{(fun s : St => r s = n)}} slow_add {{(fun (_ : unit ) (s : St) => r s = (Nat.add 10 n))}}.
+  Proof.
+  eapply weaken.
+  eapply strengthen.
+  apply foreach_rule.
+  + 
