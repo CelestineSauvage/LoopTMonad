@@ -9,7 +9,7 @@ Local Notation "f ∘ g" := (fun x => f (g x)) (at level 40, left associativity)
 (* State Monad *)
 
 Record St : Type:= {
-  r : nat
+  r : nat;
 }.
 
 Definition State (A : Type) := St -> A * St.
@@ -287,8 +287,8 @@ Notation "'for' i '=' min 'to' max '{{' body }}" := (foreach min max (fun i => (
 max at level 60, body at level 60, right associativity) : monad_scope.
 
 (* Notation "'for_e' i '=' min 'to' max '{{' body }}" := (foreach min max (fun i => (body))) (at level 60, i ident, min at level 60,
-max at level 60, body at level 60, right associativity) : monad_scope.
- *)
+max at level 60, body at level 60, right associativity) : monad_scope. *)
+
 (* Notation "'for2' i '=' min 'to' max '{{' body }}" := (foreach min max (fun i => (body))) (at level 60, i ident, min at level 60,
 max at level 60, body at level 60, right associativity) : monad_scope. *)
 
@@ -356,36 +356,58 @@ Lemma foreach_break_rule (min max : nat) (P : St -> Prop) (body : nat -> State (
     {{P}} foreach max min (fun it0 => if (cond) then break else loopT_liftT (body it0)) {{fun _ s => P s /\ cond = false}}.
   Admitted.
 
-(* Lemma foreach_break_rule_2 (min max : nat) (P : () -> St -> Prop) (body : nat -> State ())
-  : forall (cond : St -> bool), (forall (it : nat), {{fun s => P tt s /\ (min <= it <= max) /\ (cond s = true) }} body it {{P}}) -> 
-    {{P tt}} foreach max min (fun it0 => if (fun s => cond s) then break else loopT_liftT (body it0)) {{fun _ s => P tt s /\ (cond s) = false}}.
+(* Lemma foreach_break_rule_2 (min max : nat) (P : () -> St -> Prop) (body : nat -> State ()) (compare : State bool)
+  : forall (cond : bool), (forall (it : nat), {{fun s => P tt s /\ (min <= it <= max) /\ (cond s = true) }} body it {{P}}) -> 
+    {{P tt}} foreach max min (fun it0 => perf cond <- compare;  if (fun s => cond s) then break else loopT_liftT (body it0))
+    {{fun _ s => P tt s /\ (cond s) = false}}.
   Admitted. *)
 
-Definition slow_add : State unit :=
-  for i = 5 to 0 {{
-    add_s 1
+Definition slow_add (m : nat) : State unit :=
+  for i = m to 0 {{
+    add_s (m + 1)
   }}.
 
-Definition fast_add : State unit :=
+(* Definition fast_add : State unit :=
   for i = 5 to 0 {{
     add_s i
-  }}.
+  }}. *)
 
-Definition parity_x : State unit :=
-  for i = 50 to 0 {{
-  }}.
+Definition compare : State bool :=
+  perf s <- get ;
+  state_pure (Nat.leb (r s) 2).
 
+(* Definition parity_x : State unit :=
+  for_e i = 500 to 0 {{
+    perf cond <- compare;
+    if (cond) then break
+    else loopT_liftT(min_s 2)
+  }}.
+ *)
+(* Compute runState parity_x {| r := 10 |}. *)
+
+(* Lemma l_parity_x :
+  {{(fun s : St => r s = 10)}} parity_x {{(fun (_ : unit ) (s : St) => r s = 2)}}.
+  Admitted. *)
 (* Lemma foreach_rule (min max : nat) (P : () -> St -> Prop) (body : nat -> State ())
   : (forall (it : nat), {{fun s => P tt s /\ (min <= it <= max)}} body it {{P}}) -> 
     {{P tt}} foreach max min (fun it0 => loopT_liftT (body it0)) {{fun _ s => P tt s}}. *)
-Lemma l_slow_add : 
- {{(fun s : St => r s = 0)}} slow_add {{(fun (_ : unit ) (s : St) => r s <= 42)}}.
+Lemma l_slow_add (m : nat) : 
+ {{(fun s : St => True)}} slow_add m{{(fun (_ : unit ) (s : St) => r s >= m)}}.
   Proof.
-  apply weaken with (fun s => r s <= 42).
-(*   eapply weaken. *)
+  unfold slow_add.
+  eapply weaken.
 (*   eapply strengthen. *)
   apply foreach_rule.
-  
+  unfold add_s.
+  intros.
+  eapply weaken.
+  apply l_modify.
+  simpl.
+  intros.
+  auto.
+  simpl.
+  intros.
+  auto.
   Admitted.
 
 Fixpoint sumsum (n : nat): nat :=
