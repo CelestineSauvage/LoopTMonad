@@ -237,8 +237,8 @@ Inductive Action (A : Type) : Type :=
 (* Definition hoareTripleS {A} (P : St -> Prop) (m : State A) (Q : A -> St -> Prop) : Prop :=
   forall (s : St), P s -> let (a, s') := m s in Q a s'. *)
 
-Lemma act_ret  (A : Type) (a : A) (P : A -> Assertion) : {{ P a }} state_pure (Atom a) 
-{{fun (_ : Action A) =>  P a }}.
+Lemma act_ret  (A : Type) (a : A) (P : Assertion) : {{P}} state_pure (Atom a) 
+{{fun (_ : Action A) =>  P }}.
 Proof.
 intros s H; trivial.
 Qed.
@@ -319,9 +319,9 @@ Definition mul_s (i : nat) : State unit :=
 (* Compute runState test_exit init_state.  *)
 
 (* in_seq: forall len start n : nat, In n (seq start len) <-> start <= n < start + len *)
-Lemma foreach_rule (min max : nat) (P : () -> St -> Prop) (body : nat -> State ())
-  : (forall (it : nat), {{fun s => P tt s /\ (min <= it <= max)}} body it {{P}}) -> 
-    {{P tt}} foreach max min (fun it0 => loopT_liftT (body it0)) {{fun _ s => P tt s}}.
+Lemma foreach_rule (min max : nat) (P : St -> Prop) (body : nat -> State ())
+  : (forall (it : nat), {{fun s => P s /\ (min <= it <= max)}} body it {{fun _ => P}}) -> 
+    {{P}} foreach max min (fun it0 => loopT_liftT (body it0)) {{fun _ => P}}.
   Proof.
   intros H.
   induction max.
@@ -351,15 +351,52 @@ Lemma foreach_rule (min max : nat) (P : () -> St -> Prop) (body : nat -> State (
             split;auto.
      Qed.
 
-Definition slow_add (m : nat) : State unit :=
-  for i = 0 to m {{
+Lemma foreach_break_rule (min max : nat) (P : St -> Prop) (body : nat -> State ())
+  : forall (cond : bool), (forall (it : nat), {{fun s => P s /\ (min <= it <= max) /\ (cond = true) }} body it {{fun _ => P}}) -> 
+    {{P}} foreach max min (fun it0 => if (cond) then break else loopT_liftT (body it0)) {{fun _ s => P s /\ cond = false}}.
+  Admitted.
+
+(* Lemma foreach_break_rule_2 (min max : nat) (P : () -> St -> Prop) (body : nat -> State ())
+  : forall (cond : St -> bool), (forall (it : nat), {{fun s => P tt s /\ (min <= it <= max) /\ (cond s = true) }} body it {{P}}) -> 
+    {{P tt}} foreach max min (fun it0 => if (fun s => cond s) then break else loopT_liftT (body it0)) {{fun _ s => P tt s /\ (cond s) = false}}.
+  Admitted. *)
+
+Definition slow_add : State unit :=
+  for i = 5 to 0 {{
     add_s 1
   }}.
 
-Lemma l_slow_add (n : nat): 
- {{(fun s : St => r s = n)}} slow_add {{(fun (_ : unit ) (s : St) => r s = (Nat.add 10 n))}}.
+Definition fast_add : State unit :=
+  for i = 5 to 0 {{
+    add_s i
+  }}.
+
+Definition parity_x : State unit :=
+  for i = 50 to 0 {{
+  }}.
+
+(* Lemma foreach_rule (min max : nat) (P : () -> St -> Prop) (body : nat -> State ())
+  : (forall (it : nat), {{fun s => P tt s /\ (min <= it <= max)}} body it {{P}}) -> 
+    {{P tt}} foreach max min (fun it0 => loopT_liftT (body it0)) {{fun _ s => P tt s}}. *)
+Lemma l_slow_add : 
+ {{(fun s : St => r s = 0)}} slow_add {{(fun (_ : unit ) (s : St) => r s <= 42)}}.
   Proof.
-  eapply weaken.
+  apply weaken with (fun s => r s <= 42).
+(*   eapply weaken. *)
+(*   eapply strengthen. *)
+  apply foreach_rule.
+  
+  Admitted.
+
+Fixpoint sumsum (n : nat): nat :=
+  match n with
+    | 0 => 0
+    | S n' => n + (sumsum n')
+  end.
+  
+Lemma l_fast_add (n : nat):
+  {{(fun s : St => r s = n)}} fast_add {{(fun (_ : unit ) (s : St) => r s < (Nat.add (sumsum 5) n))}}.
+  Proof.
+  apply weaken with (fun s => r s <= 42).
   eapply strengthen.
   apply foreach_rule.
-  + 
