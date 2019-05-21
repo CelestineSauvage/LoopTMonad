@@ -4,13 +4,17 @@ Set Implicit Arguments.
 
 Import Notations.
 
+Section monads.
+
 Local Notation "f ∘ g" := (fun x => f (g x)) (at level 40, left associativity).
 
 (* State Monad *)
 
-Record St : Type:= {
+(* Record St : Type:= {
   r : nat;
-}.
+}. *)
+
+Variable St : Type.
 
 Definition State (A : Type) := St -> A * St.
 
@@ -283,42 +287,6 @@ Program Fixpoint foreach (it min : nat) (body : nat -> LoopT ()) : State () :=
         | 0 => state_pure tt
        end.
 
-Notation "'for' i '=' min 'to' max '{{' body }}" := (foreach min max (fun i => (loopT_liftT body))) (at level 60, i ident, min at level 60,
-max at level 60, body at level 60, right associativity) : monad_scope.
-
-(* Notation "'for_e' i '=' min 'to' max '{{' body }}" := (foreach min max (fun i => (body))) (at level 60, i ident, min at level 60,
-max at level 60, body at level 60, right associativity) : monad_scope. *)
-
-(* Notation "'for2' i '=' min 'to' max '{{' body }}" := (foreach min max (fun i => (body))) (at level 60, i ident, min at level 60,
-max at level 60, body at level 60, right associativity) : monad_scope. *)
-
-Definition init_state : St := {|r := 1|}.
-
-Definition add_s (i : nat) : State unit :=
-  modify (fun s => {| r := s.(r) + i |}).
-
-Definition min_s (i : nat) : State unit :=
-modify (fun s => {| r := s.(r) - i |}).
-
-Definition mul_s (i : nat) : State unit :=
-  modify (fun s => {| r := s.(r) * i |}).
-
-(* Definition fac5 : State unit :=
-  for i = 5 to 0 {{
-    mul_s i
-  }}.
- *)
-(* Compute runState fac5 init_state.  *)
-
-(* Definition test_exit : State () :=
-   for_e i = 0 to 20 {{
-    if (i =? 5) then break
-    else (loopT_liftT (add_s 1))
-  }}.
- *)
-(* Compute runState test_exit init_state.  *)
-
-(* in_seq: forall len start n : nat, In n (seq start len) <-> start <= n < start + len *)
 Lemma foreach_rule (min max : nat) (P : St -> Prop) (body : nat -> State ())
   : (forall (it : nat), {{fun s => P s /\ (min <= it <= max)}} body it {{fun _ => P}}) -> 
     {{P}} foreach max min (fun it0 => loopT_liftT (body it0)) {{fun _ => P}}.
@@ -356,15 +324,69 @@ Lemma foreach_break_rule (min max : nat) (P : St -> Prop) (body : nat -> State (
     {{P}} foreach max min (fun it0 => if (cond) then break else loopT_liftT (body it0)) {{fun _ s => P s /\ cond = false}}.
   Admitted.
 
+Notation "'for' i '=' max 'to' min '{{' body }}" := (foreach max min (fun i => (loopT_liftT body))) (at level 60, i ident, min at level 60,
+max at level 60, body at level 60, right associativity) : monad_scope.
+
+(* (* Notation "'for_e' i '=' min 'to' max '{{' body }}" := (foreach min max (fun i => (body))) (at level 60, i ident, min at level 60,
+max at level 60, body at level 60, right associativity) : monad_scope. *)
+
+(* Notation "'for2' i '=' min 'to' max '{{' body }}" := (foreach min max (fun i => (body))) (at level 60, i ident, min at level 60,
+max at level 60, body at level 60, right associativity) : monad_scope. *) *)
+
+End monads.
+
+Notation "m1 ;; m2" := (state_bind m1 (fun _ => m2))  (at level 60, right associativity) : monad_scope.
+Notation "'perf' x '<-' m ';' e" := (state_bind m (fun x => e))
+  (at level 60, x ident, m at level 200, e at level 60) : monad_scope.
+Notation "{{ P }} m {{ Q }}" := (hoareTripleS P m Q)
+(at level 90, format "'[' '[' {{  P  }}  ']' '/  ' '[' m ']' '['  {{  Q  }} ']' ']'") : monad_scope.
+Notation "'for' i '=' max 'to' min '{{' body }}" := (foreach max min (fun i => (loopT_liftT body))) (at level 60, i ident, min at level 60,
+max at level 60, body at level 60, right associativity) : monad_scope.
+
+Open Scope monad_scope.
+
+Record MySt : Type:= {
+  r : nat;
+}. 
+
+Definition init_state : MySt := {|r := 1|}.
+
+Definition add_s (i : nat) : State MySt unit :=
+  modify (fun s => {| r := s.(r) + i |}).
+
+Definition min_s (i : nat) : State MySt unit :=
+modify (fun s => {| r := s.(r) - i |}).
+
+Definition mul_s (i : nat) : State MySt unit :=
+  modify (fun s => {| r := s.(r) * i |}).
+
+(* Definition fac5 : State unit :=
+  for i = 5 to 0 {{
+    mul_s i
+  }}.
+ *)
+(* Compute runState fac5 init_state.  *)
+
+(* Definition test_exit : State () :=
+   for_e i = 0 to 20 {{
+    if (i =? 5) then break
+    else (loopT_liftT (add_s 1))
+  }}.
+ *)
+(* Compute runState test_exit init_state.  *)
+
+(* in_seq: forall len start n : nat, In n (seq start len) <-> start <= n < start + len *)
+
+
 (* Lemma foreach_break_rule_2 (min max : nat) (P : () -> St -> Prop) (body : nat -> State ()) (compare : State bool)
   : forall (cond : bool), (forall (it : nat), {{fun s => P tt s /\ (min <= it <= max) /\ (cond s = true) }} body it {{P}}) -> 
     {{P tt}} foreach max min (fun it0 => perf cond <- compare;  if (fun s => cond s) then break else loopT_liftT (body it0))
     {{fun _ s => P tt s /\ (cond s) = false}}.
   Admitted. *)
 
-Definition slow_add (m : nat) : State unit :=
+Definition slow_add (m : nat) : State MySt unit :=
   for i = m to 0 {{
-    add_s (m + 1)
+    add_s m
   }}.
 
 (* Definition fast_add : State unit :=
@@ -372,8 +394,8 @@ Definition slow_add (m : nat) : State unit :=
     add_s i
   }}. *)
 
-Definition compare : State bool :=
-  perf s <- get ;
+Definition compare : State MySt bool :=
+  perf s <- (@get MySt) ;
   state_pure (Nat.leb (r s) 2).
 
 (* Definition parity_x : State unit :=
@@ -392,7 +414,7 @@ Definition compare : State bool :=
   : (forall (it : nat), {{fun s => P tt s /\ (min <= it <= max)}} body it {{P}}) -> 
     {{P tt}} foreach max min (fun it0 => loopT_liftT (body it0)) {{fun _ s => P tt s}}. *)
 Lemma l_slow_add (m : nat) : 
- {{(fun s : St => True)}} slow_add m{{(fun (_ : unit ) (s : St) => r s >= m)}}.
+ {{(fun s : MySt => True)}} slow_add m{{(fun (_ : unit ) (s : MySt) => r s >= m)}}.
   Proof.
   unfold slow_add.
   eapply weaken.
@@ -416,9 +438,75 @@ Fixpoint sumsum (n : nat): nat :=
     | S n' => n + (sumsum n')
   end.
   
-Lemma l_fast_add (n : nat):
+(* Lemma l_fast_add (n : nat):
   {{(fun s : St => r s = n)}} fast_add {{(fun (_ : unit ) (s : St) => r s < (Nat.add (sumsum 5) n))}}.
   Proof.
   apply weaken with (fun s => r s <= 42).
   eapply strengthen.
-  apply foreach_rule.
+  apply foreach_rule. *)
+
+Record tab : Type := {
+  mytab : list nat
+}.
+
+Fixpoint changeElement (i n : nat) (l: list nat) : list nat :=
+ match (l,i) with
+  | ([], _) => []
+  | (a :: l', 0) => n :: l'
+  | (a :: l', S i') => a :: changeElement i' n l'
+  end.
+
+(* Compute changeElement 8 18 [0;1;2;3;4;5]. *)
+
+Definition changeTab (i n: nat) : State tab unit :=
+  modify (fun s => {| mytab := changeElement i n (mytab s)|}).
+
+(* Compute nth 2 [0;1;2;3;4;5] 0. *)
+
+Definition table : tab := {|mytab := [0;0;0;0;0] |}.
+
+SearchPattern (nat -> nat -> bool).
+
+(* Compute Nat.ltb 10 10. *)
+
+Definition changeTab_m : State tab unit :=
+  for i = 4 to 0 {{
+    changeTab i i
+  }}.
+
+Compute runState changeTab_m table.
+
+Lemma dsqd (P : () -> tab -> Prop) :
+  {{P tt}} changeTab_m {{P}}.
+  Admitted.
+
+(* Compute Nat.ltb 3 1. *)
+
+Fixpoint init_table_aux (timeout : nat) (m : nat) : State tab unit :=
+  match timeout with
+    | 0 => state_pure tt
+    | S ti' =>  if (Nat.ltb 4 m) then state_pure tt
+                else changeTab m m;; 
+                      init_table_aux ti' (S m)
+  end.
+
+Definition init_table (timeout m : nat) : State tab unit :=
+  init_table_aux timeout m.
+
+Lemma initPEntry (tm m : nat):
+  {{fun (s : tab)=> True}} init_table tm m {{fun _ s => True}}.
+  Proof.
+  unfold init_table.
+  unfold init_table_aux.
+  assert (Hsize : tm + m >= tm) by omega.
+  revert Hsize.
+  revert m.
+  generalize tm.
+  induction tm0.
+  + intros.
+    eapply weaken.
+    eapply ret.
+    simpl.
+    auto.
+  + intros.
+    

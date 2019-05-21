@@ -29,7 +29,7 @@ Open Scope monad_scope.
 (*   hoareTriple : forall {A} (P : S -> Prop) (ma : m A) (Q : A -> S -> Prop) (s : S), P s -> let (a, s') := (run ma s) in Q a s' *)
 
 (* Monad Transformer *)
-Class MonadTrans {m} `{Monad m} (t : (Type -> Type) -> (Type -> Type)) `{Monad(t m)}  := {
+Class MonadTrans {m} `{MonadState m} (t : (Type -> Type) -> (Type -> Type)) `{MonadState (t m)}  := {
   (* Lift fonction and monade transformers laws *)
   liftT : forall {A}, m A -> t m A;
   lifT_id : forall {A : Type} (a : A), (liftT ∘ return_) a = return_ a;
