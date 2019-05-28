@@ -28,33 +28,24 @@ Program Definition defaultIndex : State tab index :=
   apply tableSizeNotZero.
   Qed.
 
-Definition sleb (a b : index) : bool := a <=? b.
+Definition sltb (a b : index) : bool := a <? b.
 
 (* Definition geb (a b : index) : State tab bool := state_pure (b <=? a). *)
-Definition leb (a b : index) : State tab bool := state_pure (a <=? b).
-(* Definition ltb (a b : index) : State tab bool := state_pure (a <? b).
-Definition gtb (a b : index) : State tab bool := state_pure (b <? a).
+(* Definition leb (a b : index) : State tab bool := state_pure (a <=? b). *)
+Definition ltb (a b : index) : State tab bool := state_pure (a <? b).
+(* Definition gtb (a b : index) : State tab bool := state_pure (b <? a).
 Definition eqb (a b : index) : State tab bool := state_pure (a =? b).  *)
 
-(* Lemma ltb  index1 index2 (P : bool -> tab -> Prop):
+Lemma Lsltb  index1 index2 (P : bool -> tab -> Prop):
 {{ fun s : tab => P (sltb index1 index2)  s }} 
-  MALInternal.Index.ltb index1 index2 {{ fun s => P s}}.
+  ltb index1 index2 {{ fun s => P s}}.
 Proof.
-unfold MALInternal.Index.ltb, StateLib.Index.ltb.
+unfold ltb, sltb.
 eapply weaken.
 eapply ret .
 trivial.
-Qed. *)
+Qed.
 
-(* Lemma eqb  index1 index2 (P : bool -> tab -> Prop):
-{{ fun s : tab => P (StateLib.Index.eqb index1 index2)  s }} 
-  MALInternal.Index.eqb index1 index2 {{ fun s => P s}}.
-Proof.
-unfold MALInternal.Index.eqb, StateLib.Index.eqb.
-eapply weaken.
-eapply ret .
-trivial.
-Qed. *)
 
 Program Definition CIndex  (p : nat) : index := 
   if (lt_dec p tableSize) then 
@@ -70,6 +61,23 @@ Program Definition Idxsucc (n : index) : State tab index :=
   then
     state_pure (Build_index isucc _)
   else defaultIndex.
+
+Definition Sidxsucc (n : index): option index:=
+  let isucc := n + 1 in
+  match lt_dec isucc tableSize with
+  | left x =>
+      Some {| i := isucc; Hi := Idxsucc_obligation_1 n x |}
+  | right _ => None
+  end.
+
+Lemma Inv_ltb index1 index2 (P : tab -> Prop):
+{{ fun s : tab => P s }} ltb index1 index2 
+{{ fun b s => P s /\ b = sltb index1 index2}}.
+Proof.
+eapply weaken.
+eapply Lsltb.
+intros. simpl. split;trivial.
+Qed.
 
 Program Definition getMaxIndex : State tab index:=
 state_pure (Build_index (tableSize - 1) _).
@@ -113,6 +121,17 @@ Definition getTableSize : State tab nat:=
 Definition addElement (n : nat) : State tab unit :=
   modify (fun s => {| mytab := n :: (mytab s)|}).
 
+Lemma LaddElement (n : nat) (P : unit -> tab -> Prop) :
+{{fun  s => P tt {| mytab := n :: (mytab s) |} }} addElement n {{P}}.
+Proof.
+unfold addElement.
+eapply weaken.
+eapply l_modify.
+intros.
+simpl.
+assumption.
+Qed.
+
 (* initialise le tableau avec size 0 *)
 (* Fixpoint initT0aux (size : nat) : State tab unit :=
   match size with
@@ -142,9 +161,9 @@ Fixpoint init_table_aux (timeout : nat) (idx : index) : State tab unit :=
   match timeout with
     | 0 => state_pure tt
     | S ti' => perf maxindex <- getMaxIndex ;
-               perf res <- leb idx maxindex ;
+               perf res <- ltb idx maxindex ;
                if (res) then
-                  changeTab idx idx ;;
+                  addElement idx ;;
                   perf nextIdx <- Idxsucc idx ;
                   init_table_aux ti' nextIdx
                else
@@ -152,23 +171,51 @@ Fixpoint init_table_aux (timeout : nat) (idx : index) : State tab unit :=
    end.
 
 Definition init_table (idx : index) : State tab unit :=
-  initT0 ;;
-  init_table_aux maxTimeOut idx.
+  init_table_aux tableSize idx.
 
 Lemma initPEntry (idx : index) :
   {{fun (s : tab)=> True}} init_table idx {{fun _ s => True}}.
   Proof.
   unfold init_table.
   unfold init_table_aux.
-  assert (Hsize : tm + m >= tm) by omega.
+  assert(Hsize : tableSize + idx >= tableSize) by omega.
   revert Hsize.
-  revert m.
-  generalize tm.
-  induction tm0.
+  revert idx.
+  generalize tableSize at 1 3.
+  induction n.
   + intros.
     eapply weaken.
     eapply ret.
     simpl.
     auto.
   + intros.
-    
+    simpl.
+    (* getMaxIndex *)
+    eapply bindRev.
+    - eapply weaken.
+      eapply LgetMaxIndex.
+      intros.
+      simpl.
+      apply H.
+(*       pattern s in H.
+      eassumption. *)
+    - intros maxidx. simpl. 
+      (* Index leb *)
+      eapply bindRev.
+      eapply weaken.
+      eapply Inv_ltb.
+      intros. simpl.
+      pattern s in H.
+      eapply H.
+      intros ltbindex.
+      simpl.
+  (* last entry *)
+  case_eq ltbindex ; intros HnotlastEntry.
+  eapply bindRev.
+  eapply weaken.
+  eapply LaddElement.
+  simpl.
+  intros.
+  try repeat rewrite and_assoc in H.
+  pattern s in H.
+  .
