@@ -121,6 +121,9 @@ Definition getTableSize : State tab nat:=
 Definition addElement (n : nat) : State tab unit :=
   modify (fun s => {| mytab := n :: (mytab s)|}).
 
+(* An assignment is locally consistent if its precondition is the appropriate 
+substitution of its postcondition:
+ *)
 Lemma LaddElement (n : nat) (P : unit -> tab -> Prop) :
 {{fun  s => P tt {| mytab := n :: (mytab s) |} }} addElement n {{P}}.
 Proof.
@@ -133,7 +136,7 @@ assumption.
 Qed.
 
 (* initialise le tableau avec size 0 *)
-(* Fixpoint initT0aux (size : nat) : State tab unit :=
+Fixpoint initT0aux (size : nat) : State tab unit :=
   match size with
     | 0 => state_pure tt
     | S size1 => addElement 0 ;;
@@ -141,10 +144,10 @@ Qed.
   end.
 
 Definition initT0 : State tab unit :=
-  initT0aux tableSize. *)
+  initT0aux tableSize.
 
 (* change un element dans une liste *)
-(* Fixpoint changeElement (i n : nat) (l: list nat) : list nat :=
+Fixpoint changeElement (i n : nat) (l: list nat) : list nat :=
  match (l,i) with
   | ([], _) => []
   | (a :: l', 0) => n :: l'
@@ -153,7 +156,16 @@ Definition initT0 : State tab unit :=
 
 (* change un élement dans notre tableau *)
 Definition changeTab (i n: nat) : State tab unit :=
-  modify (fun s => {| mytab := changeElement i n (mytab s)|}). *)
+  modify (fun s => {| mytab := changeElement i n (mytab s)|}).
+
+(* regarde qu'un element est bien placé dans le tableau *)
+Definition readTabEntry (idx : index) : option nat :=
+let entry :=  lookup paddr idx memory beqPage beqIndex  in 
+  match entry with
+  | Some (PE a) => Some a.(pa)
+  | Some _ => None
+  | None => None
+ end. 
 
 (* Compute Nat.ltb 3 1. *)
 
@@ -173,6 +185,7 @@ Fixpoint init_table_aux (timeout : nat) (idx : index) : State tab unit :=
 Definition init_table (idx : index) : State tab unit :=
   init_table_aux tableSize idx.
 
+(* montrer que ∀ idx < currentidx, tab[idx] = idx *)
 Lemma initPEntry (idx : index) :
   {{fun (s : tab)=> True}} init_table idx {{fun _ s => True}}.
   Proof.
@@ -218,4 +231,4 @@ Lemma initPEntry (idx : index) :
   intros.
   try repeat rewrite and_assoc in H.
   pattern s in H.
-  .
+  
