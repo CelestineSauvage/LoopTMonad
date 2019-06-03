@@ -158,14 +158,13 @@ Fixpoint changeElement (i n : nat) (l: list nat) : list nat :=
 Definition changeTab (i n: nat) : State tab unit :=
   modify (fun s => {| mytab := changeElement i n (mytab s)|}).
 
-(* regarde qu'un element est bien placé dans le tableau *)
-Definition readTabEntry (idx : index) : option nat :=
-let entry :=  lookup paddr idx memory beqPage beqIndex  in 
-  match entry with
-  | Some (PE a) => Some a.(pa)
-  | Some _ => None
-  | None => None
- end. 
+(* (* regarde qu'un element est bien placé dans le tableau *)
+Definition readTabEntry (idx : index) : State tab nat :=
+  perf ltab <- @get tab ;
+  state_pure (nth idx (mytab ltab) 0). *)
+
+Definition readTabEntry (idx : index) (ltab : tab) : nat :=
+  nth idx (mytab ltab) 0.
 
 (* Compute Nat.ltb 3 1. *)
 
@@ -231,4 +230,15 @@ Lemma initPEntry (idx : index) :
   intros.
   try repeat rewrite and_assoc in H.
   pattern s in H.
+  match type of H with
+  | ?HT s => instantiate (1 := fun tt s => HT s /\ 
+               readTabEntry idx s = idx )
+  end.
+  simpl.
+  destruct H as (Hreadlt & Hmax & Hlt).
+  split. split.
+  trivial.
+  repeat split ; assumption.
+  unfold readTabEntry.
+  cbn.
   
