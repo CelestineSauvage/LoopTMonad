@@ -189,7 +189,7 @@ Lemma initPEntry (idx : index) :
   {{fun (s : tab)=> True}} init_table idx {{fun _ s => True}}.
   Proof.
   unfold init_table.
-  unfold init_table_aux.
+(*   unfold init_table_aux. *)
   assert(Hsize : tableSize + idx >= tableSize) by omega.
   revert Hsize.
   revert idx.

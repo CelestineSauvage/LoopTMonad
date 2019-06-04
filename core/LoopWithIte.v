@@ -291,18 +291,52 @@ Definition getIt : State nat :=
 Definition decrementsIt : State unit :=
   modify (fun s => {| state := s.(state) ; it_loop := s.(it_loop) - 1 |}).
 
-Program Fixpoint foreach (it min : nat) (body : nat -> LoopT ()) : State () :=
-  perf it2 <- getIt ; 
-  if (Nat.leb it2 min) then state_pure tt
+Definition setIt (i : nat) : State unit :=
+  modify (fun s => {| state := s.(state) ; it_loop := i|}).
+
+Program Fixpoint foreach' (it min : nat) (body : nat -> LoopT ()) : State () :=
+  if (Nat.leb it min) then state_pure tt
   else match it with
         | S it' => perf out <- runLoopT (body it);
                                decrementsIt ;;
                                 match out with
                                   | Break => state_pure tt
-                                  | _ => foreach it' min body
+                                  | _ => foreach' it' min body
                                 end
         | 0 => state_pure tt
        end.
+
+Definition foreach (it min : nat) (body : nat -> LoopT ()) : State () :=
+  setIt it ;;
+  foreach' it min body.
+
+Lemma LsetIt (it : nat) (P : unit -> St -> Prop) :
+  {{fun  s => P tt {| state := s.(state) ; it_loop := it |} }} setIt it {{P}}.
+  Proof.
+  unfold setIt.
+  eapply weaken.
+  eapply l_modify.
+  intros.
+  simpl.
+  assumption.
+  Qed.
+
+(* Lemma eq_arg_it_loop (it min: nat) (P : unit -> St -> Prop) (body : nat -> State ()) :
+  {{fun s => True}} 
+    foreach it min (fun it0 => loopT_liftT (body it0)) 
+    {{fun _ s => P tt {| state := s.(state) ; it_loop := it |} }}.
+  Proof.
+  unfold foreach.
+(*   apply weaken with (fun _ => it = it). *)
+  eapply weaken.
+  eapply bindRev.
+  apply LsetIt.
+  + intros [].
+    unfold foreach'.
+    induction it.
+    - case_eq (0 <=? min).
+      * intros .
+        eapply ret. *)
 
 Lemma foreach_rule (min max : nat) (P : St -> Prop) (body : nat -> State ())
   : (forall (it : nat), {{fun s => P s /\ (min <= it <= max)}} body it {{fun _ => P}}) -> 

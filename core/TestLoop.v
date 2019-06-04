@@ -1,4 +1,4 @@
-Require Import LoopV2 Program List ZArith Arith.
+Require Import LoopV2 Program List ZArith Arith Coq.Logic.Classical_Prop.
 
 Section ResNat.
 
@@ -163,6 +163,8 @@ Definition readTabEntry (idx : nat) (ltab : tab) : nat :=
     -  
   Qed. *)
 
+
+
 Fixpoint changeElement (i n : nat) (l: list nat) : list nat :=
  match (l,i) with
   | ([], _) => []
@@ -170,8 +172,40 @@ Fixpoint changeElement (i n : nat) (l: list nat) : list nat :=
   | (a :: l', S i') => a :: changeElement i' n l'
   end.
 
+SearchAbout nil.
+
+Lemma LchangeElement (n : nat) :
+  forall (l : list nat) (i : nat) , i < length l -> In n (changeElement i n l).
+  Proof.
+  intro l.
+  induction l.
+  - intros.
+    simpl in H.
+    omega.
+  - simpl in *.
+    induction i.
+    + intros. simpl. auto.
+    + intros.
+      apply lt_S_n in H.
+      simpl.
+      right.
+      apply IHl.
+      apply H.
+  Qed.
+
+(* Lemma LchangeElement (i n : nat) :
+  forall l : list nat, i < length l -> nth i (changeElement i n l) n = n.
+  Proof.
+  induction l.
+  + intros.
+    simpl in H.
+    inversion H. 
+  + intros.
+    
+ *)
 Definition changeTab (i n: nat) : State tab unit :=
   modify (fun s => {| mytab := changeElement i n (mytab s)|}).
+
 
 Definition init_table (size : nat) : State tab unit :=
   for i = size to 0 {{
@@ -190,18 +224,38 @@ Definition goodInitT0 (size : nat) (l : tab) : Prop :=
 Definition goodInitTable (size : nat) (l : tab) : Prop :=
   length (mytab l) = size /\ (forall i : nat, 0 <= i < size /\ (readTabEntry i l = i + 1 )).
 
+Definition goodInitITable (size i_max : nat) (l : tab) : Prop :=
+  length (mytab l) = size /\ (forall i : nat, 0 <= i < i_max /\ (readTabEntry i l = i + 1 )).
+
 (* Definition invariantTable (i :  (l : tab) : Prop *)
+
 
 Lemma initPEntry (size : nat)  :
   {{fun (s : tab) => goodInitT0 size s}} init_table size {{fun _ s => goodInitTable size s}}.
   Proof.
   unfold init_table.
-  unfold foreach.
-  revert size.
+(*   unfold foreach. *)
+  apply weaken with (fun s => goodInitITable size size s).
+  2 : intros.
   induction size.
-  +  intros s_init [HInit1 HInit2]. unfold foreach.
-     edestruct HInit2 as [H1 H2].
-     intuition ; omega.
-  + case_eq (S size <=? 0).
+  +  intros s_init Hinit.
+      cbn.
+      unfold goodInitITable in Hinit.
+      unfold goodInitTable.
+      assumption.
+  + unfold foreach. 
+    case_eq (S size <=? 0).
+    - intros s.
+      unfold goodInitTable.
+      intros s0 H2.
+      unfold goodInitITable in H2.
+      apply H2.
     - intros.
-      apply ret.
+      simpl in H.
+      eapply bindRev.
+      unfold runLoopT.
+      unfold loopT_liftT.
+      unfold state_liftM.
+      eapply bindRev.
+      intros s HGoodInit.
+      
