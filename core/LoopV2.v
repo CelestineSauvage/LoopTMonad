@@ -276,8 +276,8 @@ Definition loopT_liftT {A} (a : State A) : LoopT A :=
 Definition break {A} : LoopT A :=
   state_pure Break.
 
-Program Fixpoint foreach (it min : nat) (body : nat -> LoopT ()) : State () :=
-  if (Nat.leb it min) then state_pure tt
+Fixpoint foreach (it min : nat) (body : nat -> LoopT ()) : State () :=
+  if (it <=? min) then state_pure tt
   else match it with
         | S it' => perf out <- runLoopT (body it);
                                 match out with
@@ -319,9 +319,11 @@ Lemma foreach_rule (min max : nat) (P : St -> Prop) (body : nat -> State ())
             split;auto.
      Qed.
 
+SearchAbout bool.
+
 Lemma foreach_break_rule (min max : nat) (P : St -> Prop) (body : nat -> State ())
   : forall (cond : bool), (forall (it : nat), {{fun s => P s /\ (min <= it <= max) /\ (cond = true) }} body it {{fun _ => P}}) -> 
-    {{P}} foreach max min (fun it0 => if (cond) then break else loopT_liftT (body it0)) {{fun _ s => P s /\ cond = false}}.
+    {{P}} foreach max min (fun it0 => if (negb cond) then break else loopT_liftT (body it0)) {{fun _ s => P s /\ cond = false}}.
   Admitted.
 
 Notation "'for' i '=' max 'to' min '{{' body }}" := (foreach max min (fun i => (loopT_liftT body))) (at level 60, i ident, min at level 60,

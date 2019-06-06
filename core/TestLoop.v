@@ -242,16 +242,129 @@ Lemma LchangeTab (i : nat) (n : nat) (P : unit -> tab -> Prop) :
 
 Definition init_table (size : nat) : State tab unit :=
   for i = size to 0 {{
-    changeTab (i-1) i 
+    addElement (i)
   }}.
 
-(* Definition init_table (size : nat) : State tab unit :=
-(*   initT0 ;; *)
-  init_table_aux size. *)
+Definition init_table0 (size : nat) : State tab unit :=
+  for i = size to 0 {{
+    addElement 0
+  }}.
 
-(* Compute runState init_table {| mytab := [] |}. *)
+Definition initPgood (curidx : nat) (l : tab) : Prop :=
+  forall i : nat, i > curidx -> readTabEntry i l = 0.
 
-Definition goodInitT0 (size : nat) (l : tab) : Prop := 
+(* Definition init_table2 (size : nat) : State tab unit :=
+  for_e i = maxTimeOut to 0 {{$
+    if (
+    addElement (size - i + 1)
+  }}. *)
+
+Definition initPgoodEnd (l : tab) : Prop :=
+  forall i : nat, i < length l -> readTabEntry i l = 0.
+
+Compute runState (init_table 10) [].
+
+Lemma initPEntry (size : nat)  :
+  {{fun (s : tab) => initPgood size s /\ (length s > size)}} init_table0 size 
+  {{fun _ (s : tab) => initPgoodEnd s}}.
+  Proof.
+  unfold init_table0.
+  eapply strengthen.
+  eapply foreach_rule.
+  + intros.
+    unfold addElement.
+    eapply weaken.
+    eapply l_modify.
+    intros.
+    simpl.
+    split ; [ | omega].
+    intuition.
+    unfold initPgood in *.
+    intros.
+    unfold readTabEntry in *.
+    generalize (H (i + 1)).
+    intros.
+    assert (i + 1 > size).
+    omega.
+    apply H4 in H5.
+    SearchAbout nth.
+    pose proof app_nth2.
+    generalize (H6 nat [0] s 2 (i+2)).
+    intros.
+    assert ( i + 2 >= length [0] ).
+    cbn.
+    omega.
+    apply H7 in H8.
+    rewrite <- H5 at 2.
+    cbn.
+    case_eq i.
+    intros.
+    omega.
+    intros.
+    subst.
+    simpl in H8.
+    simpl in H7.
+    replace (i + 1 - 1) with i in * by omega.
+    case_eq (i + 1).
+    intros.
+    omega.
+    intros.
+    rewrite H9 in H8.
+    cbn.
+    cbn in H7.
+    pattern s in H.
+     match type of H with
+    | ?HT s => instantiate (1 := fun tt s => HT s /\ 
+                 readTabEntry 0 s = (size - it + 1 ) )
+    end.
+    simpl.
+    split.
+    assumption.
+    unfold readTabEntry.
+    cbn.
+    omega.
+    cbn.
+    intros.
+    trivial.
+  Qed.
+
+
+(* Definition goodInitTable (curidx : nat) (l : tab) : Prop :=
+  (forall i : nat, 0 <= i < curidx /\ (readTabEntry i l = (curidx - i) + 1 )). *)
+
+Definition initPgood (size curidx : nat) (l : tab) : Prop :=
+  readTabEntry curidx l = (curidx - i) + 1 ))
+
+Lemma initPEntry2 (size : nat)  :
+  {{fun (s : tab) => goodInitTable 0 s}} init_table size {{fun _ s => goodInitTable size s}}.
+  Proof.
+  unfold init_table.
+  eapply strengthen.
+  eapply weaken.
+  eapply foreach_rule.
+  2: { 
+  intros.
+  eapply H.
+  }
+  1: {
+  + intros.
+    unfold addElement.
+    eapply weaken.
+    eapply l_modify.
+    intros.
+    simpl.
+    pattern s in H.
+     match type of H with
+    | ?HT s => instantiate (1 := fun tt s => HT s /\ 
+                 readTabEntry 0 s = (size - it + 1 ) )
+    end.
+
+Definition init_table2 (size : nat) : State tab unit :=
+  for i = size to 0 {{
+    addElement (size - i + 1)
+  }}.
+
+(* Definition goodInitT0 (size : nat) (l : tab) : Prop := 
   length l = size /\ (forall i : nat, 0 <= i < size /\ (readTabEntry i l = 0)).
 
 Definition goodInitTable (size : nat) (l : tab) : Prop :=
@@ -259,11 +372,45 @@ Definition goodInitTable (size : nat) (l : tab) : Prop :=
 
 Definition goodInitITable (size i_max : nat) (l : tab) : Prop :=
   length l = size /\ (forall i : nat, 0 <= i < i_max /\ (readTabEntry i l = i + 1 )).
-
+ *)
 (* Definition invariantTable (i :  (l : tab) : Prop *)
 
-
-Lemma initPEntry (size : nat)  :
+(* Lemma initPEntry (size : nat)  :
+  {{fun (_ : tab) => True}} init_table size {{fun _ _ => True}}.
+  Proof.
+  (* revert size. *)
+  unfold init_table.
+  unfold foreach.
+  induction size.
+  (* induction size. *)
+  + cbn.
+    eapply weaken.
+    apply ret.
+    trivial.
+  + cbn.
+    eapply bindRev.
+    - unfold runLoopT. unfold loopT_liftT. unfold state_liftM.
+      eapply bindRev.
+      * eapply weaken.
+        apply LaddElement.
+        intros.
+        simpl.
+        pattern s in H.
+        match type of H with
+        | ?HT s => instantiate (1 := fun tt s => HT s /\ 
+                     readTabEntry 0 s = 1 )
+        end.
+        simpl.
+        split.
+        trivial.
+        unfold readTabEntry.
+        cbn.
+        omega.
+     *  intros [].
+        intros s H.
+        cbn. *)
+        
+(* Lemma initPEntry (size : nat)  :
   {{fun (s : tab) => goodInitT0 size s}} init_table size {{fun _ s => goodInitTable size s}}.
   Proof.
   unfold init_table.
@@ -294,4 +441,4 @@ Lemma initPEntry (size : nat)  :
       (* eapply weaken. *)
       eapply LchangeTab.
       * simpl.
-        intros.
+        intros. *)

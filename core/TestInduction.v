@@ -212,10 +212,10 @@ Lemma initPEntry (idx : index) :
 (*   unfold init_table_aux. *)
   assert (tableSize > 0) as HTB0.
   apply tableSizeNotZero.
-  assert(Hsize : tableSize + idx >= tableSize) by omega.
-  revert Hsize.
+(*   assert(Hsize : tableSize + idx >= tableSize) by omega.
+  revert Hsize. *) (** besoin pour des triplets plus complexes **)
   revert idx.
-  generalize tableSize at 1 3. (* remettre dans le contexte table size *)
+  generalize tableSize. (* remettre dans le contexte table size *)
   induction n. (* induction pas sur le vrai itérateur *)
   + intros.
     eapply weaken.
@@ -308,8 +308,9 @@ Lemma initPEntry (idx : index) :
   inversion H0.
   destruct idxsucc, idx.
   simpl in *.
-  omega.
-  now contradict H0.
+  (* omega. *)
+(*   now contradict H0. *)
+  trivial.
   trivial.
   eapply weaken.
   apply ret.
