@@ -120,15 +120,17 @@ Axiom timeOutBiggerTableSize : tableSize < maxTimeOut.
   i :> nat ;
   Hi : i < tableSize }. *)
 
-Record tab : Type := {
+(* Record tab : Type := {
   mytab : list nat
-}.
+}. *)
+
+Definition tab : Type := list nat.
 
 Definition addElement (n : nat) : State tab unit :=
-  modify (fun s => {| mytab := n :: (mytab s)|}).
+  modify (fun s => n :: s).
 
 Lemma LaddElement (n : nat) (P : unit -> tab -> Prop) :
-{{fun  s => P tt {| mytab := n :: (mytab s) |} }} addElement n {{P}}.
+{{fun  s => P tt (n :: s) }} addElement n {{P}}.
 Proof.
 unfold addElement.
 eapply weaken.
@@ -144,7 +146,7 @@ Definition initT0 : State tab unit :=
   }}.
 
 Definition readTabEntry (idx : nat) (ltab : tab) : nat :=
-  nth idx (mytab ltab) 0.
+  nth idx ltab idx.
 
 (* Definition goodInitT0 (l : tab) :=
   exists i : nat, length (mytab l) = i /\ (readTabEntry i l = 0). *)
@@ -165,7 +167,7 @@ Definition readTabEntry (idx : nat) (ltab : tab) : nat :=
 
 
 
-Fixpoint changeElement (i n : nat) (l: list nat) : list nat :=
+Fixpoint changeElement (i n : nat) (l: tab) : tab :=
  match (l,i) with
   | ([], _) => []
   | (a :: l', 0) => n :: l'
@@ -174,16 +176,17 @@ Fixpoint changeElement (i n : nat) (l: list nat) : list nat :=
 
 SearchAbout nil.
 
-Lemma LchangeElement (n : nat) :
-  forall (l : list nat) (i : nat) , i < length l -> In n (changeElement i n l).
+Lemma LchangeElement_in (i : nat) (n : nat) :
+  forall (l : tab)  , i < length l -> In n (changeElement i n l).
   Proof.
   intro l.
+  generalize i.
   induction l.
   - intros.
     simpl in H.
     omega.
   - simpl in *.
-    induction i.
+    induction i0.
     + intros. simpl. auto.
     + intros.
       apply lt_S_n in H.
@@ -192,6 +195,26 @@ Lemma LchangeElement (n : nat) :
       apply IHl.
       apply H.
   Qed.
+
+Lemma LchangeElement_nth (i : nat) (n : nat) :
+  forall (l : tab)  , i < length l -> nth i (changeElement i n l) n = n.
+  Proof.
+  intro l.
+  generalize i.
+  induction l.
+  - intros.
+    simpl in H.
+    omega.
+  - simpl in *.
+    induction i0.
+    + intros. simpl. auto.
+    + intros.
+      apply lt_S_n in H.
+      simpl.
+      apply IHl.
+      apply H.
+  Qed.
+
 
 (* Lemma LchangeElement (i n : nat) :
   forall l : list nat, i < length l -> nth i (changeElement i n l) n = n.
@@ -204,8 +227,18 @@ Lemma LchangeElement (n : nat) :
     
  *)
 Definition changeTab (i n: nat) : State tab unit :=
-  modify (fun s => {| mytab := changeElement i n (mytab s)|}).
+  modify (fun s => changeElement i n s).
 
+Lemma LchangeTab (i : nat) (n : nat) (P : unit -> tab -> Prop) :
+  {{fun  s => P tt (changeElement i n s) }} changeTab i n {{P}}.
+  Proof.
+  unfold addElement.
+  eapply weaken.
+  eapply l_modify.
+  intros.
+  simpl.
+  assumption.
+  Qed.
 
 Definition init_table (size : nat) : State tab unit :=
   for i = size to 0 {{
@@ -219,13 +252,13 @@ Definition init_table (size : nat) : State tab unit :=
 (* Compute runState init_table {| mytab := [] |}. *)
 
 Definition goodInitT0 (size : nat) (l : tab) : Prop := 
-  length (mytab l) = size /\ (forall i : nat, 0 <= i < size /\ (readTabEntry i l = 0)).
+  length l = size /\ (forall i : nat, 0 <= i < size /\ (readTabEntry i l = 0)).
 
 Definition goodInitTable (size : nat) (l : tab) : Prop :=
-  length (mytab l) = size /\ (forall i : nat, 0 <= i < size /\ (readTabEntry i l = i + 1 )).
+  length l = size /\ (forall i : nat, 0 <= i < size /\ (readTabEntry i l = i + 1 )).
 
 Definition goodInitITable (size i_max : nat) (l : tab) : Prop :=
-  length (mytab l) = size /\ (forall i : nat, 0 <= i < i_max /\ (readTabEntry i l = i + 1 )).
+  length l = size /\ (forall i : nat, 0 <= i < i_max /\ (readTabEntry i l = i + 1 )).
 
 (* Definition invariantTable (i :  (l : tab) : Prop *)
 
@@ -236,7 +269,7 @@ Lemma initPEntry (size : nat)  :
   unfold init_table.
 (*   unfold foreach. *)
   apply weaken with (fun s => goodInitITable size size s).
-  2 : intros.
+  (* 2 : intros. *)
   induction size.
   +  intros s_init Hinit.
       cbn.
@@ -249,6 +282,7 @@ Lemma initPEntry (size : nat)  :
       unfold goodInitTable.
       intros s0 H2.
       unfold goodInitITable in H2.
+      simpl.
       apply H2.
     - intros.
       simpl in H.
@@ -257,5 +291,7 @@ Lemma initPEntry (size : nat)  :
       unfold loopT_liftT.
       unfold state_liftM.
       eapply bindRev.
-      intros s HGoodInit.
-      
+      (* eapply weaken. *)
+      eapply LchangeTab.
+      * simpl.
+        intros.

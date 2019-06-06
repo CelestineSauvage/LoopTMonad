@@ -6,6 +6,7 @@ Require Import Coq.Logic.ProofIrrelevance Omega Setoid.
   Definition maxTimeOut := 20. *)
 (* End simulation *)
 
+(* Definition tableSize := 10. *)
 Axiom tableSize : nat.
 Axiom maxTimeOut : nat.
 
@@ -70,6 +71,17 @@ Definition Sidxsucc (n : index): option index:=
   | right _ => None
   end.
 
+Lemma WKsucc  (idx : index) (P: index -> tab -> Prop) :
+{{fun s => idx < (tableSize -1) /\ forall  l : idx + 1 < tableSize , 
+    P {| i := idx + 1; Hi := Idxsucc_obligation_1 idx l |} s}} 
+    Idxsucc idx {{ P }}.
+Admitted.
+
+Lemma Lsucc (idx : index) P :
+{{fun s => P s  /\ idx < tableSize - 1}} Idxsucc idx 
+{{fun (idxsuc : index) s => P s  /\ Sidxsucc idx = Some idxsuc }}.
+Admitted.
+
 Lemma Inv_ltb index1 index2 (P : tab -> Prop):
 {{ fun s : tab => P s }} ltb index1 index2 
 {{ fun b s => P s /\ b = sltb index1 index2}}.
@@ -78,6 +90,12 @@ eapply weaken.
 eapply Lsltb.
 intros. simpl. split;trivial.
 Qed.
+
+Lemma indexltbTrue : 
+forall i1 i2 : index , 
+sltb i1 i2 = true -> i1 < i2.
+Admitted.
+
 
 Program Definition getMaxIndex : State tab index:=
 state_pure (Build_index (tableSize - 1) _).
@@ -170,36 +188,42 @@ Definition readTabEntry (idx : index) (ltab : tab) : nat :=
 
 Fixpoint init_table_aux (timeout : nat) (idx : index) : State tab unit :=
   match timeout with
-    | 0 => state_pure tt
-    | S ti' => perf maxindex <- getMaxIndex ;
-               perf res <- ltb idx maxindex ;
-               if (res) then
-                  addElement idx ;;
+    | 0 => state_pure tt (* cas qui normalement n'arrive jamais *) 
+    | S ti' => perf maxindex <- getMaxIndex ; (* retourne l'indice à ne pas dépasser *)
+               perf res <- ltb idx maxindex ; (* compare l'index à la borne max *)
+               if (res) then (* si c'est bon on ajoute le nouvel élement dans le tableau *)
+                  addElement (idx + 1) ;;
                   perf nextIdx <- Idxsucc idx ;
                   init_table_aux ti' nextIdx
-               else
+               else (* sinon on sort de la boucle *)
                   state_pure tt
    end.
 
 Definition init_table (idx : index) : State tab unit :=
   init_table_aux tableSize idx.
 
+Compute runState (init_table {|i := 0|}) {| mytab := [] |}.
+
 (* montrer que ∀ idx < currentidx, tab[idx] = idx *)
 Lemma initPEntry (idx : index) :
-  {{fun (s : tab)=> True}} init_table idx {{fun _ s => True}}.
+  {{fun (_ : tab)=> True}} init_table idx {{fun _ _ => True}}.
   Proof.
   unfold init_table.
 (*   unfold init_table_aux. *)
+  assert (tableSize > 0) as HTB0.
+  apply tableSizeNotZero.
   assert(Hsize : tableSize + idx >= tableSize) by omega.
   revert Hsize.
   revert idx.
-  generalize tableSize at 1 3.
-  induction n.
+  generalize tableSize at 1 3. (* remettre dans le contexte table size *)
+  induction n. (* induction pas sur le vrai itérateur *)
   + intros.
     eapply weaken.
-    eapply ret.
+    unfold init_table_aux.
+    apply ret.
+    intros.
     simpl.
-    auto.
+    trivial.
   + intros.
     simpl.
     (* getMaxIndex *)
@@ -218,13 +242,14 @@ Lemma initPEntry (idx : index) :
       eapply Inv_ltb.
       intros. simpl.
       pattern s in H.
-      eapply H.
+      apply H.
       intros ltbindex.
       simpl.
-  (* last entry *)
+  (* not last entry *)
   case_eq ltbindex ; intros HnotlastEntry.
   eapply bindRev.
   eapply weaken.
+  (* on ajoute l'element idx dans le tableau *)
   eapply LaddElement.
   simpl.
   intros.
@@ -232,13 +257,63 @@ Lemma initPEntry (idx : index) :
   pattern s in H.
   match type of H with
   | ?HT s => instantiate (1 := fun tt s => HT s /\ 
-               readTabEntry idx s = idx )
+               readTabEntry (CIndex 0) s = (idx + 1) )
   end.
   simpl.
   destruct H as (Hreadlt & Hmax & Hlt).
   split. split.
   trivial.
-  repeat split ; assumption.
+  split ; assumption.
   unfold readTabEntry.
-  cbn.
-  
+  cbn. 
+  unfold CIndex.
+  case_eq (lt_dec 0 tableSize).
+  intros.
+  simpl.
+  reflexivity.
+  intros.
+  omega.
+  (* incrementation de idx *)
+  intros [].
+  eapply bindRev.
+  eapply weaken.
+  apply Lsucc.
+  intros.
+  simpl.
+  split.
+  try repeat rewrite and_assoc in H.  
+  pattern s in H.
+  eassumption. 
+  assert (maxidx = CIndex (tableSize - 1) /\ 
+  true = sltb idx maxidx)
+  as (Hcuridx & Hidx').
+  intuition.
+  subst.
+  symmetry in Hidx'.
+  apply indexltbTrue in Hidx'.
+  unfold CIndex in Hidx'.
+  destruct (lt_dec (tableSize - 1) tableSize).
+  simpl in *. assumption. contradict n0.
+  omega.
+  (** recursion **)
+  intros idxsucc.
+  simpl.
+  unfold hoareTripleS in *.
+  intros.
+  apply IHn.
+  destruct H.
+  clear H IHn.
+  unfold Sidxsucc in *.
+  case_eq (lt_dec (idx + 1) tableSize) ;intros; rewrite H in *.
+  inversion H0.
+  destruct idxsucc, idx.
+  simpl in *.
+  omega.
+  now contradict H0.
+  trivial.
+  eapply weaken.
+  apply ret.
+  simpl.
+  intros.
+  trivial.
+  Qed.

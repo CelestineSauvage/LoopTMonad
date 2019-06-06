@@ -12,7 +12,7 @@ Definition slow_add (m : nat) : State nat unit :=
   }}.
 
 Lemma l_slow_add (m : nat) : 
- {{(fun s : nat => True)}} slow_add m {{(fun (_ : unit ) (s : nat) => s >= m)}}.
+ {{(fun s : nat => s = 0)}} slow_add m {{(fun (_ : unit ) (s : nat) => s >= m)}}.
   Proof.
   unfold slow_add.
   eapply weaken.
