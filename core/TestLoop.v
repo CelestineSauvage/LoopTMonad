@@ -245,13 +245,21 @@ Definition init_table (size : nat) : State tab unit :=
     addElement (i)
   }}.
 
+Definition init_tablei (size : nat) : State tab unit :=
+  for i = size to 0 {{
+    changeTab (i - 1) i
+  }}.
+
 Definition init_table0 (size : nat) : State tab unit :=
   for i = size to 0 {{
     addElement 0
   }}.
 
-Definition initPgood (curidx : nat) (l : tab) : Prop :=
-  forall i : nat, i > curidx -> readTabEntry i l = 0.
+Definition initPgoodi (curidx : nat) (l : tab) : Prop :=
+  forall i : nat, curidx < i < length l -> readTabEntry i l = i+1.
+
+Definition allGood (l : tab) : Prop :=
+  forall i : nat, i < length l -> readTabEntry i l = i + 1.
 
 (* Definition init_table2 (size : nat) : State tab unit :=
   for_e i = maxTimeOut to 0 {{$
@@ -259,13 +267,45 @@ Definition initPgood (curidx : nat) (l : tab) : Prop :=
     addElement (size - i + 1)
   }}. *)
 
-Definition initPgoodEnd (l : tab) : Prop :=
-  forall i : nat, i < length l -> readTabEntry i l = 0.
+(* Definition initPgoodEnd (l : tab) : Prop :=
+  forall i : nat, i < length l -> readTabEntry i l = 0. *)
 
-Compute runState (init_table 10) [].
+Compute runState (init_tablei 10) [0;0;0;0;0;0;0;0;0;0].
 
 Lemma initPEntry (size : nat)  :
-  {{fun (s : tab) => initPgood size s /\ (length s > size)}} init_table0 size 
+  {{fun (s : tab) => initPgoodi size s /\ (length s > size)}} init_tablei size 
+  {{fun _ (s : tab) => allGood s}}.
+  Proof.
+  unfold init_tablei.
+  apply strengthen with (fun _ (s : tab) => initPgoodi size s /\ length s > size).
+  induction size.
+  + cbn.
+    intros s H; trivial.
+  + unfold foreach.
+    cbn.
+    eapply bindRev.
+    - unfold runLoopT.
+      unfold loopT_liftT.
+      unfold state_liftM.
+      eapply bindRev.
+      eapply weaken.
+      eapply LchangeTab.
+      cbn.
+      intros.
+      pattern s in H.
+       match type of H with
+      | ?HT s => instantiate (1 := fun tt s => HT s )
+      end.
+      simpl.
+      destruct H as (Hinit & Hlen).
+      
+    unfold initPgoodi in H.
+    intuition.
+    cbn.
+    eapply
+
+Lemma initPEntry (size : nat)  :
+  {{fun (s : tab) => initPgoodi size s /\ (length s > size)}} init_tablei size 
   {{fun _ (s : tab) => initPgoodEnd s}}.
   Proof.
   unfold init_table0.
