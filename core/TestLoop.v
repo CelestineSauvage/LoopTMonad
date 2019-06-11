@@ -108,6 +108,7 @@ Section ResTab.
 
 Axiom tableSize : nat.
 Axiom maxTimeOut : nat.
+Axiom defaultValue : nat.
 
 
 Axiom tableSizeNotZero : tableSize > 0.
@@ -146,7 +147,7 @@ Definition initT0 : State tab unit :=
   }}.
 
 Definition readTabEntry (idx : nat) (ltab : tab) : nat :=
-  nth idx ltab (idx + 1).
+  nth idx ltab defaultValue.
 
 (* Definition goodInitT0 (l : tab) :=
   exists i : nat, length (mytab l) = i /\ (readTabEntry i l = 0). *)
@@ -164,8 +165,6 @@ Definition readTabEntry (idx : nat) (ltab : tab) : nat :=
     intuition.
     -  
   Qed. *)
-
-
 
 Fixpoint changeElement (i n : nat) (l: tab) : tab :=
  match (l,i) with
@@ -205,10 +204,10 @@ Lemma LchangeElement_in (i : nat) (n : nat) :
   Qed.
 
 Lemma LchangeElement_nth (i : nat) (n : nat) :
-  forall (l : tab)  , i < length l -> nth i (changeElement i n l) n = n.
+  forall (l : tab)  , i < length l -> readTabEntry i (changeElement i n l) = n.
   Proof.
-  Admitted.
-(*   intro l.
+(*   Admitted. *)
+  intro l.
   generalize i.
   induction l.
   - intros.
@@ -221,13 +220,16 @@ Lemma LchangeElement_nth (i : nat) (n : nat) :
       apply lt_S_n in H.
       simpl.
       apply IHl.
-      apply H. *)
+      apply H.
   Qed.
 
-Lemma LchangeElement_inf (i n : nat) :
-  forall (l : tab) (j : nat) , j < i < length l -> nth j (changeElement i n l) n = nth j l n.
-  Admitted.
+(* Lemma LchangeElement_read (i : nat) (n : nat) :
+  forall (l : tab)  , i < length l -> readTabEntry i (changeElement i n l) = n.
+  Admitted. *)
 
+Lemma LchangeElement_inf (i : nat) (n : nat) :
+  forall (l : tab) (j : nat) , j <= i < length l -> readTabEntry j (changeElement i n l) = readTabEntry j l.
+  Admitted.
 
 (* Lemma LchangeElement (i n : nat) :
   forall l : list nat, i < length l -> nth i (changeElement i n l) n = n.
@@ -279,10 +281,7 @@ Definition initPgoodi (curidx : nat) (l : tab) : Prop :=
   forall i : nat, curidx < i < length l -> readTabEntry i l = i+1.
 
 Definition initPgoodi_inv (curidx : nat) (l : tab) : Prop :=
-  forall i : nat, i < curidx < length l -> readTabEntry i l = i+1.
-
-Definition allGood (l : tab) : Prop :=
-  forall i : nat, i < length l -> readTabEntry i l = i + 1.
+  forall i : nat, i <= curidx < length l -> readTabEntry i l = i+1.
 
 (* Definition init_table2 (size : nat) : State tab unit :=
   for_e i = maxTimeOut to 0 {{$
@@ -300,7 +299,7 @@ Compute runState (init_tablei 10) [0;0;0;0;0;0;0;0;0;0].
 
 Lemma initPEntry (size : nat)  :
   {{fun (s : tab) => initPgoodi size s /\ (length s > size)}} init_tablei size 
-  {{fun _ (s : tab) => allGood s}}.
+  {{fun _ (s : tab) => initPgoodEndI s}}.
   Proof.
   unfold init_tablei.
   apply strengthen with (fun _ (s : tab) => initPgoodi size s /\ length s > size).
@@ -331,14 +330,14 @@ Lemma initPEntry (size : nat)  :
     eapply *)
   Admitted.  
 
-Definition Prop1 (n : nat) (st : tab) : Prop :=
-  (length st = n) /\ initPgoodi n st.
+(* Definition Prop1 (n : nat) (st : tab) : Prop :=
+  (length st = n) /\ initPgoodi n st. *)
 
 Definition Prop2 (n : nat) (st : tab) : Prop :=
   (length st > n) /\ initPgoodi_inv n st.
 
 Lemma initPEntryI2 (size : nat) :
-  {{fun (s : tab) => Prop2 size s }} init_tablei2 size 
+  {{fun (s : tab) => Prop2 0 s }} init_tablei2 size 
   {{fun _ (s : tab) => initPgoodEndI s}}.
   Proof.
   unfold init_tablei.
@@ -360,23 +359,33 @@ Lemma initPEntryI2 (size : nat) :
     omega.
     intros.
     pose proof LchangeElement_nth.
-    unfold readTabEntry.
     intuition.
     assert (i < length (changeElement it (it + 1) s)) by omega.
     generalize (H3 it (it + 1) s).
     intros.
-    assert (nth it (changeElement it (it + 1) s) (it + 1) = it + 1).
+    assert (readTabEntry it (changeElement it (it + 1) s) = it + 1).
     apply H7.
     omega.
     pose proof LchangeElement_inf.
     generalize (H9 it (it + 1) s i).
     intros.
-    unfold readTabEntry in H1.
-    assert ( nth i s (i + 1) = i + 1).
+    assert (readTabEntry i s = i + 1).
     auto.
-
-    apply H9.
-    apply H7.
+    rewrite <- H11.
+    apply H10.
+    omega.
+  + unfold Prop2.
+    intros s [] HP.
+    destruct HP.
+(*     unfold initPgoodEndI. *)
+    (* intros. *)
+    unfold initPgoodi_inv in H0.
+    simpl in *.
+    intros.
+    apply H0.
+    split.
+    omega.
+    omega.
  Qed.
 
 Lemma initPEntryI (size : nat)  :

@@ -353,7 +353,7 @@ Definition foreach2 (min max : nat) (body : nat -> LoopT ()) : State () :=
 
 Lemma foreach2_rule2 (min max : nat) (P : nat -> St -> Prop) (body : nat -> State ())
   : (forall (it : nat), {{fun s => P it s /\ (min <= it < max)}} body it {{fun _ => P it}}) -> 
-    {{P max}} foreach2 min max (fun it0 => loopT_liftT (body it0)) {{fun _ => P min}}.
+    {{P min}} foreach2 min max (fun it0 => loopT_liftT (body it0)) {{fun _ => P max}}.
     Admitted.
 
 
