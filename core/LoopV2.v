@@ -1,4 +1,4 @@
-Require Import Program List ZArith Arith.
+Require Import Program List Arith.
 
 Set Implicit Arguments.
 
@@ -319,7 +319,10 @@ Lemma foreach_rule (min max : nat) (P : St -> Prop) (body : nat -> State ())
             split;auto.
      Qed.
 
-SearchAbout bool.
+Lemma foreach_rule2 (min max : nat) (P : nat -> St -> Prop) (body : nat -> State ())
+  : (forall (it : nat), {{fun s => P it s /\ (min < it <= max)}} body it {{fun _ => P it}}) -> 
+    {{P max}} foreach max min (fun it0 => loopT_liftT (body it0)) {{fun _ => P min}}.
+    Admitted.
 
 Lemma foreach_break_rule (min max : nat) (P : St -> Prop) (body : nat -> State ())
   : forall (cond : bool), (forall (it : nat), {{fun s => P s /\ (min <= it <= max) /\ (cond = true) }} body it {{fun _ => P}}) -> 
@@ -335,6 +338,26 @@ max at level 60, body at level 60, right associativity) : monad_scope. *)
 (* Notation "'for2' i '=' min 'to' max '{{' body }}" := (foreach min max (fun i => (body))) (at level 60, i ident, min at level 60,
 max at level 60, body at level 60, right associativity) : monad_scope. *) *)
 
+Fixpoint foreach2' (vals : list nat) (body : nat -> LoopT ()) : State () :=
+  match vals with
+    | nil => state_pure tt
+    | (it :: its) => perf out <- runLoopT (body it);
+                    match out with
+                      | Break => state_pure tt
+                      | _ => foreach2' its body
+                    end
+  end.
+
+Definition foreach2 (min max : nat) (body : nat -> LoopT ()) : State () :=
+  foreach2' (seq min (max-min)) body.
+
+Lemma foreach2_rule2 (min max : nat) (P : nat -> St -> Prop) (body : nat -> State ())
+  : (forall (it : nat), {{fun s => P it s /\ (min <= it < max)}} body it {{fun _ => P it}}) -> 
+    {{P max}} foreach2 min max (fun it0 => loopT_liftT (body it0)) {{fun _ => P min}}.
+    Admitted.
+
+
+
 End monads.
 
 Notation "m1 ;; m2" := (state_bind m1 (fun _ => m2))  (at level 60, right associativity) : monad_scope.
@@ -343,6 +366,9 @@ Notation "'perf' x '<-' m ';' e" := (state_bind m (fun x => e))
 Notation "{{ P }} m {{ Q }}" := (hoareTripleS P m Q)
 (at level 90, format "'[' '[' {{  P  }}  ']' '/  ' '[' m ']' '['  {{  Q  }} ']' ']'") : monad_scope.
 Notation "'for' i '=' max 'to' min '{{' body }}" := (foreach max min (fun i => (loopT_liftT body))) (at level 60, i ident, min at level 60,
+max at level 60, body at level 60, right associativity) : monad_scope.
+
+Notation "'for2' i '=' min 'to' max '{{' body }}" := (foreach2 min max (fun i => (loopT_liftT body))) (at level 60, i ident, min at level 60,
 max at level 60, body at level 60, right associativity) : monad_scope.
 
 Open Scope monad_scope.

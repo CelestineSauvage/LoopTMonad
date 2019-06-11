@@ -146,7 +146,7 @@ Definition initT0 : State tab unit :=
   }}.
 
 Definition readTabEntry (idx : nat) (ltab : tab) : nat :=
-  nth idx ltab idx.
+  nth idx ltab (idx + 1).
 
 (* Definition goodInitT0 (l : tab) :=
   exists i : nat, length (mytab l) = i /\ (readTabEntry i l = 0). *)
@@ -176,6 +176,14 @@ Fixpoint changeElement (i n : nat) (l: tab) : tab :=
 
 SearchAbout nil.
 
+Lemma LchangeElement_size1 (l : tab)  :
+  forall (i n : nat), length l = length (changeElement i n l).
+  Admitted.
+
+Lemma LchangeElement_size2 (l : tab)  :
+  forall (i n : nat), length (changeElement i n l) = length l.
+  Admitted.
+
 Lemma LchangeElement_in (i : nat) (n : nat) :
   forall (l : tab)  , i < length l -> In n (changeElement i n l).
   Proof.
@@ -199,7 +207,8 @@ Lemma LchangeElement_in (i : nat) (n : nat) :
 Lemma LchangeElement_nth (i : nat) (n : nat) :
   forall (l : tab)  , i < length l -> nth i (changeElement i n l) n = n.
   Proof.
-  intro l.
+  Admitted.
+(*   intro l.
   generalize i.
   induction l.
   - intros.
@@ -212,8 +221,12 @@ Lemma LchangeElement_nth (i : nat) (n : nat) :
       apply lt_S_n in H.
       simpl.
       apply IHl.
-      apply H.
+      apply H. *)
   Qed.
+
+Lemma LchangeElement_inf (i n : nat) :
+  forall (l : tab) (j : nat) , j < i < length l -> nth j (changeElement i n l) n = nth j l n.
+  Admitted.
 
 
 (* Lemma LchangeElement (i n : nat) :
@@ -250,6 +263,13 @@ Definition init_tablei (size : nat) : State tab unit :=
     changeTab (i - 1) i
   }}.
 
+Definition init_tablei2 (size : nat) : State tab unit :=
+  for2 i = 0 to size {{
+    changeTab i (i + 1)
+  }}.
+
+Compute runState (init_tablei2 10) [0;0;0;0;0;0;0;0;0;0].
+
 Definition init_table0 (size : nat) : State tab unit :=
   for i = size to 0 {{
     addElement 0
@@ -257,6 +277,9 @@ Definition init_table0 (size : nat) : State tab unit :=
 
 Definition initPgoodi (curidx : nat) (l : tab) : Prop :=
   forall i : nat, curidx < i < length l -> readTabEntry i l = i+1.
+
+Definition initPgoodi_inv (curidx : nat) (l : tab) : Prop :=
+  forall i : nat, i < curidx < length l -> readTabEntry i l = i+1.
 
 Definition allGood (l : tab) : Prop :=
   forall i : nat, i < length l -> readTabEntry i l = i + 1.
@@ -267,8 +290,11 @@ Definition allGood (l : tab) : Prop :=
     addElement (size - i + 1)
   }}. *)
 
-(* Definition initPgoodEnd (l : tab) : Prop :=
-  forall i : nat, i < length l -> readTabEntry i l = 0. *)
+Definition initPgoodEnd0 (l : tab) : Prop :=
+  forall i : nat, i < length l -> readTabEntry i l = 0.
+
+Definition initPgoodEndI (l : tab) : Prop :=
+  forall i : nat, i < length l -> readTabEntry i l = i + 1.
 
 Compute runState (init_tablei 10) [0;0;0;0;0;0;0;0;0;0].
 
@@ -298,30 +324,89 @@ Lemma initPEntry (size : nat)  :
       end.
       simpl.
       destruct H as (Hinit & Hlen).
-      
+(*       
     unfold initPgoodi in H.
     intuition.
     cbn.
-    eapply
+    eapply *)
+  Admitted.  
 
-Lemma initPEntry (size : nat)  :
-  {{fun (s : tab) => initPgoodi size s /\ (length s > size)}} init_tablei size 
-  {{fun _ (s : tab) => initPgoodEnd s}}.
+Definition Prop1 (n : nat) (st : tab) : Prop :=
+  (length st = n) /\ initPgoodi n st.
+
+Definition Prop2 (n : nat) (st : tab) : Prop :=
+  (length st > n) /\ initPgoodi_inv n st.
+
+Lemma initPEntryI2 (size : nat) :
+  {{fun (s : tab) => Prop2 size s }} init_tablei2 size 
+  {{fun _ (s : tab) => initPgoodEndI s}}.
   Proof.
-  unfold init_table0.
+  unfold init_tablei.
   eapply strengthen.
-  eapply foreach_rule.
+  eapply foreach2_rule2.
   + intros.
-    unfold addElement.
+    unfold Prop2.
     eapply weaken.
     eapply l_modify.
     intros.
-    simpl.
-    split ; [ | omega].
+    destruct H.
+    destruct H.
+    unfold initPgoodi_inv in *.
+    split.
     intuition.
-    unfold initPgood in *.
+    assert (length (changeElement it (it + 1) s) = length s).
+(*     rewrite <- H at 3. *)
+    apply LchangeElement_size2.
+    omega.
+    intros.
+    pose proof LchangeElement_nth.
+    unfold readTabEntry.
+    intuition.
+    assert (i < length (changeElement it (it + 1) s)) by omega.
+    generalize (H3 it (it + 1) s).
+    intros.
+    assert (nth it (changeElement it (it + 1) s) (it + 1) = it + 1).
+    apply H7.
+    omega.
+    pose proof LchangeElement_inf.
+    generalize (H9 it (it + 1) s i).
+    intros.
+    unfold readTabEntry in H1.
+    assert ( nth i s (i + 1) = i + 1).
+    auto.
+
+    apply H9.
+    apply H7.
+ Qed.
+
+Lemma initPEntryI (size : nat)  :
+  {{fun (s : tab) => Prop1 size s }} init_tablei size 
+  {{fun _ (s : tab) => initPgoodEndI s}}.
+  Proof.
+  unfold init_table0.
+  eapply strengthen.
+  eapply foreach_rule2; unfold Prop1.
+  + intros.
+    unfold changeTab.
+    eapply weaken.
+    eapply l_modify.
+    intros.
+    destruct H.
+    simpl.
+    split.
+    intuition.
+    rewrite <- H1 at 3.
+    apply LchangeElement_size2.
+    unfold initPgoodi in *.
     intros.
     unfold readTabEntry in *.
+    destruct H.
+    SearchAbout nth.
+    pose proof LchangeElement_nth.
+    generalize (H3 (it - 1) (it)).
+    intros.
+    apply H2.
+    apply nth_in_or_default
     generalize (H (i + 1)).
     intros.
     assert (i + 1 > size).
