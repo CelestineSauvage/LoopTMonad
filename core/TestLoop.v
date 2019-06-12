@@ -1,5 +1,7 @@
 Require Import LoopV2 Program List ZArith Arith Coq.Logic.Classical_Prop.
 
+Set Implicit Arguments.
+
 Section ResNat.
 
 Record MySt : Type:= {
@@ -109,7 +111,6 @@ Section ResTab.
 Axiom tableSize : nat.
 Axiom maxTimeOut : nat.
 Axiom defaultValue : nat.
-
 
 Axiom tableSizeNotZero : tableSize > 0.
 Axiom timeOutNotZero : maxTimeOut > 0.
@@ -342,7 +343,7 @@ Lemma initPEntryI2 (size : nat) :
   Proof.
   unfold init_tablei.
   eapply strengthen.
-  eapply foreach2_rule2.
+  eapply foreach2_rule2; unfold Prop2 in *.
   + intros.
     unfold Prop2.
     eapply weaken.
@@ -380,13 +381,80 @@ Lemma initPEntryI2 (size : nat) :
 (*     unfold initPgoodEndI. *)
     (* intros. *)
     unfold initPgoodi_inv in H0.
-    simpl in *.
+    unfold initPgoodEndI.
+    Admitted.
+(*     replace (i <= size < length s) with (i < length s) in H0.
     intros.
     apply H0.
     split.
+    
+ Qed. *)
+
+Definition getSize : State tab nat :=
+  perf s <- (@get tab);
+  state_pure (length s).
+
+Definition init_tablei3 : State tab unit :=
+  perf size <- getSize ;
+  for2 i = 0 to size {{
+    changeTab i (i + 1)
+  }}.
+
+Definition Prop3 (n : nat) (st : tab) : Prop :=
+  initPgoodi_inv n st.
+
+Lemma LgetSize P : 
+{{ fun s => P s }} getSize 
+{{ fun size s => P s /\ size = length s }}.
+(*   Proof.
+  unfold getSize.
+  eapply bindRev.
+  + apply l_get.
+  + intros.
+    simpl.
+    split.
+    assumption.
+    reflexi
+ *)
+  
+
+Lemma initPEntryI3 (size : nat) :
+  {{fun (s : tab) => Prop3 0 s }} init_tablei3 
+  {{fun _ (s : tab) => initPgoodEndI s}}.
+  Proof.
+  unfold init_tablei3.
+  eapply bindRev.
+  
+  eapply strengthen.
+  eapply foreach2_rule2; unfold Prop3 in *.
+  + intros.
+    eapply weaken.
+    eapply l_modify.
+    intros.
+    destruct H.
+    unfold initPgoodi_inv in *.
+    intuition.
+(*     assert (length (changeElement it (it + 1) s) = length s). *)
+(*     rewrite <- H at 3. *)
+(*     apply LchangeElement_size2. *)
+(*     omega. *)
+(*     intros. *)
+    pose proof LchangeElement_nth.
+(*     intuition. *)
+    assert (i < length (changeElement it (it + 1) s)) by omega.
+    generalize (H0 it (it + 1) s).
+    intros.
+    assert (readTabEntry it (changeElement it (it + 1) s) = it + 1).
+    apply H6.
     omega.
+    pose proof LchangeElement_inf.
+    generalize (H9 it (it + 1) s i).
+    intros.
+    assert (readTabEntry i s = i + 1).
+    auto.
+    rewrite <- H11.
+    apply H10.
     omega.
- Qed.
 
 Lemma initPEntryI (size : nat)  :
   {{fun (s : tab) => Prop1 size s }} init_tablei size 
