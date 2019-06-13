@@ -330,7 +330,7 @@ Lemma initPEntry (size : nat)  :
     cbn.
     eapply *)
   Admitted.  
-
+ 
 (* Definition Prop1 (n : nat) (st : tab) : Prop :=
   (length st = n) /\ initPgoodi n st. *)
 
@@ -403,58 +403,79 @@ Definition init_tablei3 : State tab unit :=
 Definition Prop3 (n : nat) (st : tab) : Prop :=
   initPgoodi_inv n st.
 
+Lemma LgetSizeWp (P : nat -> tab -> Prop) :
+{{wp P getSize}} getSize {{P}}.
+  Proof.
+  eapply wpIsPrecondition.
+  Qed.
+
 Lemma LgetSize P : 
 {{ fun s => P s }} getSize 
 {{ fun size s => P s /\ size = length s }}.
-(*   Proof.
+  Proof.
+    eapply weaken.
+    eapply LgetSizeWp.
+    cbn.
+    intros.
+    intuition.
+  Qed.
+
+(* Lemma LgetSize (P : nat -> tab -> Prop) :
+{{ fun s : tab => P (length s)  s }} 
+  getSize {{ fun s => P s}}.
+  Proof.
   unfold getSize.
   eapply bindRev.
-  + apply l_get.
-  + intros.
-    simpl.
-    split.
-    assumption.
-    reflexi
- *)
-  
+  + apply l_get. *)
 
 Lemma initPEntryI3 (size : nat) :
-  {{fun (s : tab) => Prop3 0 s }} init_tablei3 
+  {{fun (s : tab) => Prop2 0 s }} init_tablei3 
   {{fun _ (s : tab) => initPgoodEndI s}}.
   Proof.
   unfold init_tablei3.
   eapply bindRev.
-  
-  eapply strengthen.
-  eapply foreach2_rule2; unfold Prop3 in *.
+  + apply LgetSize.
   + intros.
+  eapply strengthen.
+  eapply foreach2_rule3. unfold Prop2 in *.
+  - intros.
     eapply weaken.
     eapply l_modify.
     intros.
     destruct H.
     unfold initPgoodi_inv in *.
     intuition.
-(*     assert (length (changeElement it (it + 1) s) = length s). *)
-(*     rewrite <- H at 3. *)
-(*     apply LchangeElement_size2. *)
-(*     omega. *)
-(*     intros. *)
+    assert (length (changeElement it (it + 1) s) = length s).
+    apply LchangeElement_size2.
+    omega. (* 
+    intros. *)
     pose proof LchangeElement_nth.
 (*     intuition. *)
     assert (i < length (changeElement it (it + 1) s)) by omega.
-    generalize (H0 it (it + 1) s).
+    generalize (H3 it (it + 1) s).
     intros.
     assert (readTabEntry it (changeElement it (it + 1) s) = it + 1).
-    apply H6.
+    apply H8.
     omega.
     pose proof LchangeElement_inf.
-    generalize (H9 it (it + 1) s i).
+    generalize (H10 it (it + 1) s i).
     intros.
     assert (readTabEntry i s = i + 1).
     auto.
-    rewrite <- H11.
+    rewrite <- H12.
     apply H10.
     omega.
+    assert (length (changeElement it (it + 1) s) = length s).
+    apply LchangeElement_size2.
+    omega.
+  - simpl.
+    intros s [] H.
+    destruct H.
+    unfold Prop2 in *.
+    destruct H.
+    unfold initPgoodi_inv .
+    omega.
+Qed.
 
 Lemma initPEntryI (size : nat)  :
   {{fun (s : tab) => Prop1 size s }} init_tablei size 

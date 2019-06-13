@@ -322,7 +322,34 @@ Lemma foreach_rule (min max : nat) (P : St -> Prop) (body : nat -> State ())
 Lemma foreach_rule2 (min max : nat) (P : nat -> St -> Prop) (body : nat -> State ())
   : (forall (it : nat), {{fun s => P it s /\ (min < it <= max)}} body it {{fun _ => P it}}) -> 
     {{P max}} foreach max min (fun it0 => loopT_liftT (body it0)) {{fun _ => P min}}.
-    Admitted.
+    Proof.
+    intros H.
+    induction max.
+    + intros st HP. simpl. auto.
+    + unfold foreach.
+      case_eq (S max <=? min);intros Hm.
+      - intros s HP. trivial.
+      - eapply bindRev .
+        unfold runLoopT.
+        unfold loopT_liftT.
+        unfold state_liftM.
+        eapply bindRev.
+        * unfold hoareTripleS in H.
+          intros st H2.
+          eapply H;split;auto.
+          split;auto.
+          apply Nat.leb_gt in Hm.
+          apply Nat.lt_le_incl.
+          auto.
+        * intros [].
+          apply act_ret.
+      * intros []. intros s HP. trivial.
+        apply IHmax.
+           ++ intros it s'.
+              intros [H1 [H2 H3]].
+              apply H.
+              split;auto.
+       Qed.
 
 Lemma foreach_break_rule (min max : nat) (P : St -> Prop) (body : nat -> State ())
   : forall (cond : bool), (forall (it : nat), {{fun s => P s /\ (min <= it <= max) /\ (cond = true) }} body it {{fun _ => P}}) -> 
@@ -358,7 +385,7 @@ Lemma foreach2_rule2 (min max : nat) (P : nat -> St -> Prop) (body : nat -> Stat
 
 Lemma foreach2_rule3 (min max : nat) (Inv : nat -> St -> Prop) (P : St -> Prop) (body : nat -> State ())
   : (forall (it : nat), {{fun s => Inv it s /\ P s /\ min <= it < max}} body it {{fun _ s => Inv it s /\ P s }}) -> 
-    {{fun s => Inv min s /\ P s}} foreach max min (fun it0 => loopT_liftT (body it0)) {{fun _ s => Inv max s /\ P s}}.
+    {{fun s => Inv min s /\ P s}} foreach2 min max (fun it0 => loopT_liftT (body it0)) {{fun _ s => Inv max s /\ P s}}.
     Admitted.
 
 End monads.
