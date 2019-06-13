@@ -1,4 +1,4 @@
-Require Import Program List Arith.
+Require Import Program List ZArith Arith Coq.Logic.Classical_Prop.
 
 Set Implicit Arguments.
 
@@ -30,14 +30,6 @@ fun (A : Type) (st_a : State A) (B : Type) (f : A -> State B) (s : S) => let (a,
 Definition state_bind {A B} (st_a : State A) (f : A -> State B)  : State B :=
   fun s => let (a, s0) := st_a s in f a s0.
 
-
-(*    bind: forall {A}, m A -> forall {B}, (A -> m B) -> m B;
-  bind_right_unit: forall A (a: m A), a = bind a return_;
-  bind_left_unit: forall A (a: A) B (f: A -> m B),
-             f a = bind (return_ a) f;
-  bind_associativity: forall A (ma: m A) B f C (g: B -> m C),
-                 bind ma (fun  x=> bind (f x) g) = bind (bind ma f) g *)
-(* Lemma bind_right_unit *)
 
 Lemma state_bind_right_unit : 
   forall (A : Type) (a: State A), a = state_bind a (@ state_pure A).
@@ -195,51 +187,10 @@ Qed.
 
 Definition state_liftM {A B} (f : A -> B) (ma : State A) : State B :=
   state_bind ma (fun a => state_pure (f a)).
-  
-(* Section Continuation. *)
-
-(* Inductive Action : Type :=
-  | Atom : State Action -> Action
-  | Stop : Action.
-
-Definition LoopT a : Type := (a -> Action) -> Action.
-
-Definition loopT_pure {A} (a : A) : LoopT A :=
-  fun (c : A -> Action) => c a.
-
-Definition loopT_bind {A} (x : LoopT A) {B} (k : A -> LoopT B) : LoopT B :=
-  fun (c : B -> Action) => x (fun a => (k a) c).
-
-Definition action {A} (x : LoopT A) : Action :=
-  x (fun (_ : A) => Stop).
-
-(* lift *)
-Definition atom {A} (x : State A) : LoopT A := 
-  fun c => Atom ( perf a <- x ; state_pure (c a)).
-
-Open Scope list_scope.
-
-Fixpoint round (lst : list Action) : State () :=
-  match lst with
-    | nil => state_pure tt
-    | (a::ax) => match a with 
-                  | Atom am => am ;; round ax
-                  | Stop => round ax
-                  end
-    end.
-
-Definition run {A} (x : LoopT A) : State () :=
-  round [action x].
-
-Definition stop {A} : LoopT A :=
-  fun c => Stop. *)
 
 Inductive Action (A : Type) : Type :=
   | Break : Action A
   | Atom : A -> Action A.
-
-(* Definition hoareTripleS {A} (P : St -> Prop) (m : State A) (Q : A -> St -> Prop) : Prop :=
-  forall (s : St), P s -> let (a, s') := m s in Q a s'. *)
 
 Lemma act_ret  (A : Type) (a : A) (P : Assertion) : {{P}} state_pure (Atom a) 
 {{fun (_ : Action A) =>  P }}.
@@ -293,7 +244,7 @@ Lemma foreach_rule (min max : nat) (P : St -> Prop) (body : nat -> State ())
   Proof.
   intros H.
   induction max.
-  + intros st HP. auto.
+  + intros st HP. simpl. auto.
   + unfold foreach.
     case_eq (S max <=? min);intros Hm.
     - intros s HP. trivial.
@@ -319,13 +270,19 @@ Lemma foreach_rule (min max : nat) (P : St -> Prop) (body : nat -> State ())
             split;auto.
      Qed.
 
-Lemma foreach_rule2 (min max : nat) (P : nat -> St -> Prop) (body : nat -> State ())
+(* Lemma foreach_rule2 (min max : nat) (P : nat -> St -> Prop) (body : nat -> State ())
   : (forall (it : nat), {{fun s => P it s /\ (min < it <= max)}} body it {{fun _ => P it}}) -> 
     {{P max}} foreach max min (fun it0 => loopT_liftT (body it0)) {{fun _ => P min}}.
     Proof.
     intros H.
     induction max.
-    + intros st HP. simpl. auto.
+    + intros st HP.
+(*       unfold foreach. *)
+      simpl.
+      generalize (H min st).
+      intros.
+      unfold hoareTripleS in H.
+      contradict.
     + unfold foreach.
       case_eq (S max <=? min);intros Hm.
       - intros s HP. trivial.
@@ -349,7 +306,19 @@ Lemma foreach_rule2 (min max : nat) (P : nat -> St -> Prop) (body : nat -> State
               intros [H1 [H2 H3]].
               apply H.
               split;auto.
-       Qed.
+       Qed. *)
+
+Lemma foreach_rule3 (min max : nat) (Inv : nat -> St -> Prop) (P : St -> Prop) (body : nat -> State ())
+  : (forall (it : nat), {{fun s => Inv it s /\ P s /\ min < it <= max}} body it {{fun _ s => Inv it s /\ P s }}) -> 
+    {{fun s => Inv max s /\ P s}} foreach max min (fun it0 => loopT_liftT (body it0)) {{fun _ s => Inv min s /\ P s}}.
+    Proof.
+    intros H.
+    induction max.
+    + assert (0 <= min) by omega.
+      intros st HP. simpl.
+      intuition.
+      unfold hoareTripleS in H.
+    Admitted.
 
 Lemma foreach_break_rule (min max : nat) (P : St -> Prop) (body : nat -> State ())
   : forall (cond : bool), (forall (it : nat), {{fun s => P s /\ (min <= it <= max) /\ (cond = true) }} body it {{fun _ => P}}) -> 
