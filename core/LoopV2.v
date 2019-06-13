@@ -356,7 +356,10 @@ Lemma foreach2_rule2 (min max : nat) (P : nat -> St -> Prop) (body : nat -> Stat
     {{P min}} foreach2 min max (fun it0 => loopT_liftT (body it0)) {{fun _ => P max}}.
     Admitted.
 
-
+Lemma foreach2_rule3 (min max : nat) (Inv : nat -> St -> Prop) (P : St -> Prop) (body : nat -> State ())
+  : (forall (it : nat), {{fun s => Inv it s /\ P s /\ min <= it < max}} body it {{fun _ s => Inv it s /\ P s }}) -> 
+    {{fun s => Inv min s /\ P s}} foreach max min (fun it0 => loopT_liftT (body it0)) {{fun _ s => Inv max s /\ P s}}.
+    Admitted.
 
 End monads.
 
