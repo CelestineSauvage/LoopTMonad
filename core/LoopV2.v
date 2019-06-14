@@ -10,10 +10,6 @@ Local Notation "f ∘ g" := (fun x => f (g x)) (at level 40, left associativity)
 
 (* State Monad *)
 
-(* Record St : Type:= {
-  r : nat;
-}. *)
-
 Variable St : Type.
 
 Definition State (A : Type) := St -> A * St.

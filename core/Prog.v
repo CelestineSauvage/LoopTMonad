@@ -1,10 +1,13 @@
-Require Import Monads List ZArith Program.
+Require Import Monads ProofMonads List ZArith Program.
 
 Open Scope monad_scope.
 
 Import ListNotations.
 
 Set Implicit Arguments.
+
+Module M := Monads.
+Module PM := ProofMonads.
 
 Section Test.
 
@@ -14,11 +17,11 @@ Definition init_S1 : nat := init_val1.
 
 Print modify.
 
-Definition add_s (i : nat) : Monads.State nat unit :=
-  Monads.modify (fun s => s + i).
+Definition add_s (i : nat) : M.State nat unit :=
+  M.modify (fun s => s + i).
 
-Definition minus_s (i : nat) : Monads.State nat unit :=
-  Monads.modify (fun s => s - i).
+Definition minus_s (i : nat) : M.State nat unit :=
+  M.modify (fun s => s - i).
 
 Definition get10 : State nat nat:= return_ 10.
 
@@ -38,7 +41,7 @@ Lemma l_add_s :
   Proof.
   intros n i s H.
   unfold add_s.
-  apply l_modify.
+  apply modify.
   auto.
   Qed.
 
@@ -113,7 +116,7 @@ Definition nth2 := 4.
 Definition init_S2 : list nat := [].
 
 Definition addElement (val : nat) : State (list nat) unit :=
-  modify (fun s => val :: s).
+  M.modify (fun s => val :: s).
 
 Compute runState (for i = 0 to nth2 {{ for j = 0 to nth2 {{addElement (i+j) }} }} ) init_S2.
 
@@ -135,11 +138,11 @@ Open Scope Z_scope.
 
 (* if/else *)
 
-Definition add_z (i : nat) : Monads.State Z unit :=
-  Monads.modify (fun s => s + Z.of_nat i).
+Definition add_z (i : nat) : M.State Z unit :=
+  M.modify (fun s => s + Z.of_nat i).
 
-Definition minus_z (i : nat) : Monads.State Z unit :=
-  Monads.modify (fun s => s - Z.of_nat i).
+Definition minus_z (i : nat) : M.State Z unit :=
+  M.modify (fun s => s - Z.of_nat i).
 
 Definition init_Z1 : Z := 0.
 

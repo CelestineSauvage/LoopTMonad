@@ -44,7 +44,7 @@ CAMLFLAGS         := $(COQMF_CAMLFLAGS)
 HASNATDYNLINK     := $(COQMF_HASNATDYNLINK)
 
 makefile.conf: 
-	coq_makefile -o makefile LoopV2.v LoopWithIte.v Monads.v Prog.v TestInduction.v TestLoopInd.v TestLoop.v Test.v
+	coq_makefile -o makefile LoopV2.v LoopWithIte.v Monads.v Prog.v ProofMonads.v TestInduction.v TestLoopInd.v TestLoop.v Test.v
 
 # This file can be created by the user to hook into double colon rules or
 # add any other Makefile code he may need
@@ -563,6 +563,7 @@ clean::
 	$(HIDE)rm -f $(BEAUTYFILES) $(VFILES:=.old)
 	$(HIDE)rm -f all.ps all-gal.ps all.pdf all-gal.pdf all.glob all-mli.tex
 	$(HIDE)rm -f $(VFILES:.v=.glob)
+	$(HIDE)rm -f $(VFILES:.v=.v.crashcoqide)
 	$(HIDE)rm -f $(VFILES:.v=.tex)
 	$(HIDE)rm -f $(VFILES:.v=.g.tex)
 	$(HIDE)rm -f pretty-timed-success.ok

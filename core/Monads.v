@@ -1,4 +1,4 @@
-Require Import Program.
+Require Import Program List ZArith Arith Coq.Logic.Classical_Prop.
 
 Set Implicit Arguments.
 
@@ -34,9 +34,6 @@ Class MonadTrans {m} `{Monad m} (t : (Type -> Type) -> (Type -> Type)) `{Monad (
   liftT : forall {A}, m A -> t m A;
   lifT_id : forall {A : Type} (a : A), (liftT ∘ return_) a = return_ a;
   lifT_bind : forall A B (ma : m A) (k : A -> m B), liftT (ma >>= k) = (liftT ma) >>= (liftT ∘ k);
-  
-  (* hoare triple *)
- (*  getT : get *)
 }.
 
 Notation "m1 ;; m2" := (bind m1 (fun _ => m2))  (at level 60, right associativity) : monad_scope.
@@ -114,6 +111,8 @@ Definition putS (x : S) : State unit :=
 Definition getS : State S :=
   fun x => (x,x).
 
+Arguments getS _ : assert.
+
 Definition runState  {A} (op : State A) : S -> A * S := op.
 
 (* Definition evalState {A} (op : State A) : S -> A := fst ∘ op. *)
@@ -143,106 +142,8 @@ Global Program Instance stateM : Monad (State) :=
 Definition modify (f : S -> S) : State () :=
   getS >>= (fun s => putS (f s)).
 
-Definition Assertion := S -> Prop.
-
 Definition hoareTripleS {A} (P : S -> Prop) (m : State A) (Q : A -> S -> Prop) : Prop :=
   forall (s : S), P s -> let (a, s') := m s in Q a s'.
-
-Notation "{{ P }} m {{ Q }}" := (hoareTripleS P m Q)
-  (at level 90, format "'[' '[' {{  P  }}  ']' '/  ' '[' m ']' '['  {{  Q  }} ']' ']'") : monad_scope.
-
-Lemma l_ret (A : Type) `{State A} (a : A) (P : A -> Assertion) : {{ P a }} return_ a {{ P }}.
-Proof.
-intros s H; trivial.
-Qed.
-
-(* Triplet de hoare sur la séquence *)
-Lemma l_bind  (A B : Type) (m : State A) (f : A -> State B) (P : Assertion)( Q : A -> Assertion) (R : B -> Assertion) :
-  (forall a, {{ Q a }} f a {{ R }}) -> {{ P }} m {{ Q }} -> {{ P }} perf x <- m ; f x {{ R }}.
-Proof. 
-intros H1 H2 s H3.
-unfold state_bind.
-case_eq (m s).
-intros.
-apply H2 in H3.
-case_eq (f a s0).
-intros b s'' H5.
-Admitted.
-
-Definition wp {A : Type} (P : A -> S -> Prop) (m : State A) :=
-  fun s => let (a,s') := m s in P a s'.
-
-Lemma wpIsPrecondition {A : Type} (P : A -> S -> Prop) (m : State A) :
-  {{ wp P m }} m {{ P }}.
-  Proof.
-  unfold wp.
-  congruence.
-  Qed.
-
-Lemma wpIsWeakestPrecondition
-  (A : Type) (P : A -> S -> Prop) (Q : S -> Prop) (m : State A) :
-  {{ Q }} m {{ P }} -> forall s, Q s -> (wp P m) s.
-  Proof.
-  trivial.
-  Qed.
-
-Lemma assoc (A B C : Type)(m : State A)(f : A -> State B)(g : B -> State C) :
-  perf y <-
-    perf x <- m ;
-    f x ;
-  g y =
-  perf x <- m ;
-  perf y <- f x ;
-  g y.
-  Proof.
-  extensionality s.
-  unfold bind.
-  case (m s).
-  simpl.
-  intros.
-  unfold state_bind.
-  case (m s).
-  intros.
-  reflexivity.
-  Qed.
-
-Lemma l_put (s : S) (P : unit -> Assertion) : {{ fun _ => P tt s }} putS s {{ P }}.
-Proof.
-intros s0 H;trivial.
-Qed.
-
-Lemma l_get (P : S -> Assertion) : {{ fun s => P s s }} getS {{ P }}.
-Proof.
-intros s H; trivial.
-Qed.
-
-Lemma bindRev (A B : Type) (m : State A) (f : A -> State B) (P : Assertion)( Q : A -> Assertion) (R : B -> Assertion) :
-  {{ P }} m {{ Q }} -> (forall a, {{ Q a }} f a {{ R }}) -> {{ P }} perf x <- m ; f x {{ R }}.
-Proof.
-intros; eapply l_bind ; eassumption.
-Qed.
-
-Lemma weaken (A : Type) (m : State A) (P Q : Assertion) (R : A -> Assertion) :
-  {{ Q }} m {{ R }} -> (forall s, P s -> Q s) -> {{ P }} m {{ R }}.
-Proof.
-intros H1 H2 s H3.
-apply H2 in H3. 
-apply H1 in H3.
-assumption. 
-Qed.
-
-Lemma l_modify f (P : () -> Assertion) : {{ fun s => P tt (f s) }} modify f {{ P }}.
-Proof.
-unfold modify.
-eapply l_bind.
-intros.
-eapply l_put.
-simpl.
-eapply weaken.
-eapply l_get.
-intros. simpl.
-assumption.
-Qed.
 
 (* Global Instance stateS : MonadState (State) :=
   {  get := @getS;
@@ -276,9 +177,6 @@ Definition loopT_bind {m e A} (x : LoopT e m A) {B} (k : A -> LoopT e m B) : Loo
 
 (* Variable m : Type -> Type.
 Variable e : Type. *)
-
-Check loopT_pure.
-Check loopT_bind.
 
 (* Monad instance *)
 Global Program Instance loopT_M {e m} : Monad (LoopT e m) :=
@@ -352,14 +250,57 @@ Definition foreach'' {m} `{Monad m} {a} (values : list a) {c} (body : a -> LoopT
 Definition foreach' {m} `{Monad m} (min max : nat) {a} (body : nat -> LoopT unit m a) : m unit :=
   foreach'' (seq min (max-min)) body.
 
-(* Notation "'foreach i '=' min 'to' max '{{' body }}" := (foreach' min max (fun i => (body))) (at level 60, i ident, min at level 60, 
-max at level 60, body at level 60, right associativity) : monad_scope. *)
-
 (* Fonction qui appelle une fois le corps de la boucle *)
 Definition once {m} `{Monad m} {a} (body : LoopT unit m a) : m unit :=
 stepLoopT body (fun _ => return_ tt).
 
 End monadic_loop.
+
+Section monadic_loop2.
+
+Variable m : Type -> Type.
+Context `{Monad m}.
+
+Inductive Action (A : Type) : Type :=
+  | Break : Action A
+  | Atom : A -> Action A.
+
+Arguments Atom [A] _.
+Arguments Break [A].
+
+Definition LoopeT m a : Type := m (Action a).
+
+Definition runLoopeT {A} (loop : LoopeT m A) : m (Action A) :=
+  loop.
+
+Definition loopeT_pure {A} (a : A) : LoopeT m A :=
+  return_ (Atom a).
+
+Definition loopeT_bind  {A} (x : LoopeT m A) {B} (k : A -> LoopeT m B) : LoopeT m B :=
+    perf o <- runLoopeT x;
+    match o with 
+      | Break => return_ Break
+      | Atom y => runLoopeT (k y)
+    end.
+
+Definition loopeT_liftT {A} (a : m A) : LoopeT m A :=
+  liftM (@Atom A) a.
+
+Definition break {A} : LoopeT m A :=
+  return_ Break.
+
+Fixpoint foreach (it min : nat) (body : nat -> LoopeT m unit) : m unit :=
+  if (it <=? min) then return_ tt
+  else match it with
+        | S it' => perf out <- runLoopeT (body it);
+                                match out with
+                                  | Break => return_ tt
+                                  | _ => foreach it' min body
+                                end
+        | 0 => return_ tt
+       end.
+
+End monadic_loop2.
 
 Notation "'for' i '=' min 'to' max '{{' body }}" := (foreach' min max (fun i => (loopT_liftT body))) (at level 60, i ident, min at level 60,
 max at level 60, body at level 60, right associativity) : monad_scope.
