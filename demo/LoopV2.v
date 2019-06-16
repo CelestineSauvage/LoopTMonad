@@ -145,7 +145,7 @@ Proof.
 intros s H; trivial.
 Qed.
 
-Lemma bindRev (A B : Type) (m : State A) (f : A -> State B) (P : Assertion)( Q : A -> Assertion) (R : B -> Assertion) :
+Lemma sequence_rule (A B : Type) (m : State A) (f : A -> State B) (P : Assertion)( Q : A -> Assertion) (R : B -> Assertion) :
   {{ P }} m {{ Q }} -> (forall a, {{ Q a }} f a {{ R }}) -> {{ P }} perf x <- m ; f x {{ R }}.
 Proof.
 intros; eapply bind ; eassumption.
@@ -223,17 +223,6 @@ Definition loopT_liftT {A} (a : State A) : LoopT A :=
 Definition break {A} : LoopT A :=
   state_pure Break.
 
-Fixpoint foreach (it min : nat) (body : nat -> LoopT ()) : State () :=
-  if (Nat.leb it min) then state_pure tt
-  else match it with
-        | S it' => perf out <- runLoopT (body it);
-                                match out with
-                                  | Break => state_pure tt
-                                  | _ => foreach it' min body
-                                end
-        | 0 => state_pure tt
-       end.
-
 Fixpoint foreachT (it min : nat) (body : nat -> LoopT ()) : State () :=
   if (it <=? min) then state_pure tt
   else match it with
@@ -245,41 +234,7 @@ Fixpoint foreachT (it min : nat) (body : nat -> LoopT ()) : State () :=
         | 0 => state_pure tt
        end.
 
-(* program fixpoint (ou function) measure TODO *)
-
 Lemma foreach_rule (min max : nat) (P : St -> Prop) (body : nat -> State ())
-  : (forall (it : nat), {{fun s => P s /\ (min < it <= max)}} body it {{fun _ => P}}) -> 
-    {{P}} foreach max min (fun it0 => loopT_liftT (body it0)) {{fun _ => P}}.
-  Proof.
-  intros H.
-  induction max.
-  + intros st HP. simpl. auto.
-  + unfold foreach.
-    case_eq (S max <=? min);intros Hm.
-    - intros s HP. trivial.
-    - eapply bindRev .
-      unfold runLoopT.
-      unfold loopT_liftT.
-      unfold state_liftM.
-      eapply bindRev.
-      * unfold hoareTripleS in H.
-        intros st H2.
-        eapply H;split;auto.
-        split;auto.
-        apply Nat.leb_gt in Hm.
-        auto.
-      * intros [].
-        apply act_ret.
-    * intros []. intros s HP. trivial.
-      apply IHmax.
-         ++ intros it s'.
-            intros [H1 [H2 H3]].
-            apply H.
-            split;auto.
-     Qed.
-
-
-Lemma foreachT_rule (min max : nat) (P : St -> Prop) (body : nat -> State ())
   : (forall (it : nat), {{fun s => P s /\ (min <= it < max)}} body it {{fun _ => P}}) -> 
     {{P}} foreachT max min (fun it0 => loopT_liftT (body it0)) {{fun _ => P}}.
   Proof.
@@ -287,13 +242,13 @@ Lemma foreachT_rule (min max : nat) (P : St -> Prop) (body : nat -> State ())
   induction max.
   + intros st HP. simpl. auto.
   + unfold foreachT.
-    case_eq (Nat.leb (S max) min);intros Hm.
+    case_eq (S max <=? min);intros Hm.
     - intros s HP. trivial.
-    - eapply bindRev .
+    - eapply sequence_rule .
       unfold runLoopT.
       unfold loopT_liftT.
       unfold state_liftM.
-      eapply bindRev.
+      eapply sequence_rule.
       * unfold hoareTripleS in H.
         intros st H2.
         eapply H;split;auto.
@@ -310,12 +265,6 @@ Lemma foreachT_rule (min max : nat) (P : St -> Prop) (body : nat -> State ())
             split;auto.
      Qed.
 
-Lemma min_max_comp :
-  forall (min max : nat), min <= S max <= min -> min = S max.
-  Proof.
-  intros.
-  omega.
-  Qed.
 (* 
 Lemma foreachT_rule2 (min max : nat) (P : nat -> St -> Prop) (body : nat -> State ())
   : min <= max -> (forall (it : nat), {{fun s => (min <= it < max) -> P it s }} body it {{fun _ => P it}}) -> 
@@ -336,11 +285,11 @@ Lemma foreachT_rule2 (min max : nat) (P : nat -> St -> Prop) (body : nat -> Stat
         assert (S max = min) by omega.
         rewrite H0 in HP.
         auto.
-      - eapply bindRev .
+      - eapply sequence_rule .
         unfold runLoopT.
         unfold loopT_liftT.
         unfold state_liftM.
-        eapply bindRev.
+        eapply sequence_rule.
         * unfold hoareTripleS in H.
           intros st H2.
           eapply H;split. 
@@ -360,34 +309,6 @@ Lemma foreachT_rule2 (min max : nat) (P : nat -> St -> Prop) (body : nat -> Stat
               split;auto.
        Qed. *)
 
-(* Lemma foreach_rule3 (min max : nat) (Inv : nat -> St -> Prop) (P : St -> Prop) (body : nat -> State ())
-  : (forall (it : nat), {{fun s => Inv it s /\ P s /\ min < it <= max}} body it {{fun _ s => Inv it s /\ P s }}) -> 
-    {{fun s => Inv max s /\ P s}} foreach max min (fun it0 => loopT_liftT (body it0)) {{fun _ s => Inv min s /\ P s}}.
-    Proof.
-    intros H.
-    induction max.
-    + assert (0 <= min) by omega.
-      intros st HP. simpl.
-      intuition.
-      unfold hoareTripleS in H.
-      generalize (H min).
-      intros.
-    Admitted. *)
-
-Lemma foreach_break_rule (min max : nat) (P : St -> Prop) (body : nat -> State ())
-  : forall (cond : bool), (forall (it : nat), {{fun s => P s /\ (min <= it <= max) /\ (cond = true) }} body it {{fun _ => P}}) -> 
-    {{P}} foreach max min (fun it0 => if (negb cond) then break else loopT_liftT (body it0)) {{fun _ s => P s /\ cond = false}}.
-  Admitted.
-
-Notation "'for' i '=' max 'to' min '{{' body }}" := (foreach max min (fun i => (loopT_liftT body))) (at level 60, i ident, min at level 60,
-max at level 60, body at level 60, right associativity) : monad_scope.
-
-(* (* Notation "'for_e' i '=' min 'to' max '{{' body }}" := (foreach min max (fun i => (body))) (at level 60, i ident, min at level 60,
-max at level 60, body at level 60, right associativity) : monad_scope. *)
-
-(* Notation "'for2' i '=' min 'to' max '{{' body }}" := (foreach min max (fun i => (body))) (at level 60, i ident, min at level 60,
-max at level 60, body at level 60, right associativity) : monad_scope. *) *)
-
 Fixpoint foreach2' (vals : list nat) (body : nat -> LoopT ()) : State () :=
   match vals with
     | nil => state_pure tt
@@ -401,11 +322,6 @@ Fixpoint foreach2' (vals : list nat) (body : nat -> LoopT ()) : State () :=
 Definition foreach2 (min max : nat) (body : nat -> LoopT ()) : State () :=
   foreach2' (seq min (max-min)) body.
 
-Lemma foreach2_rule2 (min max : nat) (P : nat -> St -> Prop) (body : nat -> State ())
-  : (forall (it : nat), {{fun s => P it s /\ (min <= it < max)}} body it {{fun _ => P it}}) -> 
-    {{P min}} foreach2 min max (fun it0 => loopT_liftT (body it0)) {{fun _ => P max}}.
-    Admitted.
-
 Lemma foreach2_rule3 (min max : nat) (Inv : nat -> St -> Prop) (P : St -> Prop) (body : nat -> State ())
   : (forall (it : nat), {{fun s => Inv it s /\ P s /\ min <= it < max}} body it {{fun _ s => Inv it s /\ P s }}) -> 
     {{fun s => Inv min s /\ P s}} foreach2 min max (fun it0 => loopT_liftT (body it0)) {{fun _ s => Inv max s /\ P s}}.
@@ -418,7 +334,7 @@ Notation "'perf' x '<-' m ';' e" := (state_bind m (fun x => e))
   (at level 60, x ident, m at level 200, e at level 60) : monad_scope.
 Notation "{{ P }} m {{ Q }}" := (hoareTripleS P m Q)
 (at level 90, format "'[' '[' {{  P  }}  ']' '/  ' '[' m ']' '['  {{  Q  }} ']' ']'") : monad_scope.
-Notation "'for' i '=' max 'to' min '{{' body }}" := (foreach max min (fun i => (loopT_liftT body))) (at level 60, i ident, min at level 60,
+Notation "'for' i '=' max 'to' min '{{' body }}" := (foreachT max min (fun i => (loopT_liftT body))) (at level 60, i ident, min at level 60,
 max at level 60, body at level 60, right associativity) : monad_scope.
 
 Notation "'for2' i '=' min 'to' max '{{' body }}" := (foreach2 min max (fun i => (loopT_liftT body))) (at level 60, i ident, min at level 60,

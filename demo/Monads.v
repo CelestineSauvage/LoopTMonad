@@ -60,7 +60,9 @@ Lemma bind_eq : forall {A B m} `{Monad m} (a a' : m A) (f f' : A -> m B),
     auto.
   Qed.
 
-(* Ltac cbnify_monad_LHS :=
+End monadic_functions.
+
+Ltac cbnify_monad_LHS :=
   repeat match goal with
   | [ |- bind (return_ _) _ = _ ] => rewrite <- bind_left_unit
   | [ |- bind (bind _ _) _ = _ ]  => rewrite <- bind_associativity
@@ -78,9 +80,7 @@ Ltac cbnify_monad :=
 Ltac cbn_m :=
   repeat (try match goal with
   [ |- bind ?a _ = bind ?a _ ] => apply bind_eq; [ reflexivity | intros ]
-  end; cbnify_monad). *)
-
-End monadic_functions.
+  end; cbnify_monad).
 
 Section monadic_state.
 
@@ -139,8 +139,8 @@ Definition LoopT e m a : Type := (forall (r : Type), (e -> m r) -> (a -> m r) ->
 
 Definition runLoopT {m e a r} (loop : LoopT e m a) : (e -> m r) -> (a -> m r) -> m r :=
   fun exit next => loop r exit next.
-
-Check runLoopT.
+(* 
+Check runLoopT. *)
 
 Arguments runLoopT {_} {_} {_} {_}.
 
@@ -153,9 +153,7 @@ Definition loopT_bind {m e A} (x : LoopT e m A) {B} (k : A -> LoopT e m B) : Loo
   (fun _ exit cont =>
     let f' := (fun a => runLoopT (k a) exit cont) in
     runLoopT x exit f').
-
-(* Variable m : Type -> Type.
-Variable e : Type. *)
+(* f' : continuation for the first loopT, cont : continuation for the scd loopT *)
 
 (* Monad instance *)
 Global Program Instance loopT_M {e m} : Monad (LoopT e m) :=
@@ -168,6 +166,7 @@ Context `{Mo : Monad m}.
 
 Definition loopT_liftT {A} (x : m A) : LoopT e m A :=
 (fun _ _ cont => bind x cont).
+(* bind from sub monad *)
 
 Global Program Instance LoopT_T  : MonadTrans (LoopT e):=
 { liftT := @loopT_liftT}.
@@ -198,37 +197,29 @@ Import List.
 
 Definition stepLoopT {e m a} `{Mo : Monad m} (body : LoopT e m a) (next : a -> m e) : m e :=
   runLoopT body (return_) next.
+  (* return_ of submonad *)
 
-Definition HoareTriple_L {A S E} (P : S -> Prop) (m : LoopT E (State S) A) (Q : (E -> S -> Prop)) : Prop :=
-  forall (s : S) (next : A -> State S E), P s -> let m' := (stepLoopT m next) in let (b,s') := m' s in Q b s'.
-
-(* Lemma foreach_rule {S} (P : S -> Prop) (m : LoopT E (State S) A) (Q : (E -> S -> Prop)
-  : forall (it:nat) (s : S), (Nat.le min it) /\ (it < max) ->  *)
-
-(*   fun loop exit next => loop r exit next. *)
-(* Definition exitWith {m E a} (e : E): LoopT E m a :=
-  fun _ fin _ => fin e. *)
-  
 Definition exit {m a} : LoopT unit m a :=
   fun _ fin _ => fin tt.
 
 Arguments exit {_} {_}.
 
-Definition when {m} `{Monad m} : bool -> m unit -> m unit :=
-  fun p s => if p then s else return_ tt. 
-
-(* Boucle qui prend une liste en paramètres et applique le corps de boucle pour chaque élement de la liste *)
-Definition foreach'' {m} `{Monad m} {a} (values : list a) {c} (body : a -> LoopT unit m c) : m unit :=
+(* Definition foreach'' {m} `{Monad m} {a} (values : list a) {c} (body : a -> LoopT unit m c) : m unit :=
   fold_right
     (fun x next => stepLoopT (body x) (fun _ => next))
     (return_ tt)
     values.
 
-(* Boucle avec un min et max qui appelle foreach' *)
 Definition foreach' {m} `{Monad m} (min max : nat) {a} (body : nat -> LoopT unit m a) : m unit :=
-  foreach'' (seq min (max-min)) body.
+  foreach'' (seq min (max-min)) body. *)
 
-(* Fonction qui appelle une fois le corps de la boucle *)
+Fixpoint foreach {m} `{Monad m}  (it min : nat) (body : nat -> LoopT unit m unit) : m unit :=
+  if (it <=? min) then return_ tt
+  else match it with
+      | S it' => stepLoopT (body it') (fun _ => foreach it' min body)
+      | 0 => return_ tt
+    end.
+
 Definition once {m} `{Monad m} {a} (body : LoopT unit m a) : m unit :=
 stepLoopT body (fun _ => return_ tt).
 
@@ -270,7 +261,7 @@ Definition break {A} : LoopeT m A :=
 Fixpoint foreach2 (it min : nat) (body : nat -> LoopeT m unit) : m unit :=
   if (it <=? min) then return_ tt
   else match it with
-        | S it' => perf out <- runLoopeT (body it);
+        | S it' => perf out <- runLoopeT (body it');
                                 match out with
                                   | Break => return_ tt
                                   | _ => foreach2 it' min body
@@ -280,8 +271,14 @@ Fixpoint foreach2 (it min : nat) (body : nat -> LoopeT m unit) : m unit :=
 
 End monadic_loop2.
 
-Notation "'for' i '=' min 'to' max '{{' body }}" := (foreach' min max (fun i => (loopT_liftT body))) (at level 60, i ident, min at level 60,
+Notation "'for' i '=' min 'to' max '{{' body }}" := (foreach min max (fun i => (loopT_liftT body))) (at level 60, i ident, min at level 60,
 max at level 60, body at level 60, right associativity) : monad_scope.
 
-Notation "'for_e' i '=' min 'to' max '{{' body }}" := (foreach' min max (fun i => (body))) (at level 60, i ident, min at level 60,
+Notation "'for_e' i '=' min 'to' max '{{' body }}" := (foreach min max (fun i => (body))) (at level 60, i ident, min at level 60,
+max at level 60, body at level 60, right associativity) : monad_scope.
+
+Notation "'for2' i '=' min 'to' max '{{' body }}" := (foreach2 min max (fun i => (loopT_liftT body))) (at level 60, i ident, min at level 60,
+max at level 60, body at level 60, right associativity) : monad_scope.
+
+Notation "'for2_e' i '=' min 'to' max '{{' body }}" := (foreach2 min max (fun i => (body))) (at level 60, i ident, min at level 60,
 max at level 60, body at level 60, right associativity) : monad_scope.

@@ -155,97 +155,8 @@ Definition initPgoodEndI (l : tab) : Prop :=
 
 Compute runState (init_tablei 10) [0;0;0;0;0;0;0;0;0;0].
 
-Lemma initPEntry (size : nat)  :
-  {{fun (s : tab) => initPgoodi size s /\ (length s > size)}} init_tablei size 
-  {{fun _ (s : tab) => initPgoodEndI s}}.
-  Proof.
-  unfold init_tablei.
-  apply strengthen with (fun _ (s : tab) => initPgoodi size s /\ length s > size).
-  induction size.
-  + cbn.
-    intros s H; trivial.
-  + unfold foreach.
-    cbn.
-    eapply bindRev.
-    - unfold runLoopT.
-      unfold loopT_liftT.
-      unfold state_liftM.
-      eapply bindRev.
-      eapply weaken.
-      eapply LchangeTab.
-      cbn.
-      intros.
-      pattern s in H.
-       match type of H with
-      | ?HT s => instantiate (1 := fun tt s => HT s )
-      end.
-      simpl.
-      destruct H as (Hinit & Hlen).
-(*       
-    unfold initPgoodi in H.
-    intuition.
-    cbn.
-    eapply *)
-  Admitted.  
- 
-Definition Prop1 (n : nat) (st : tab) : Prop :=
-  (length st = n) /\ initPgoodi n st.
-
 Definition Prop2 (n : nat) (st : tab) : Prop :=
   (length st > n) /\ initPgoodi_inv n st.
-
-Lemma initPEntryI2 (size : nat) :
-  {{fun (s : tab) => Prop2 0 s }} init_tablei2 size 
-  {{fun _ (s : tab) => initPgoodEndI s}}.
-  Proof.
-  unfold init_tablei.
-  eapply strengthen.
-  eapply foreach2_rule2; unfold Prop2 in *.
-  + intros.
-    unfold Prop2.
-    eapply weaken.
-    eapply l_modify.
-    intros.
-    destruct H.
-    destruct H.
-    unfold initPgoodi_inv in *.
-    split.
-    intuition.
-    assert (length (changeElement it (it + 1) s) = length s).
-(*     rewrite <- H at 3. *)
-    apply LchangeElement_size2.
-    omega.
-    intros.
-    pose proof LchangeElement_nth.
-    intuition.
-    assert (i < length (changeElement it (it + 1) s)) by omega.
-    generalize (H3 it (it + 1) s).
-    intros.
-    assert (readTabEntry it (changeElement it (it + 1) s) = it + 1).
-    apply H7.
-    omega.
-    pose proof LchangeElement_inf.
-    generalize (H9 it (it + 1) s i).
-    intros.
-    assert (readTabEntry i s = i + 1).
-    auto.
-    rewrite <- H11.
-    apply H10.
-    omega.
-  + unfold Prop2.
-    intros s [] HP.
-    destruct HP.
-(*     unfold initPgoodEndI. *)
-    (* intros. *)
-    unfold initPgoodi_inv in H0.
-    unfold initPgoodEndI.
-    Admitted.
-(*     replace (i <= size < length s) with (i < length s) in H0.
-    intros.
-    apply H0.
-    split.
-    
- Qed. *)
 
 Definition getSize : State tab nat :=
   perf s <- (@get tab);
@@ -277,20 +188,12 @@ Lemma LgetSize P :
     intuition.
   Qed.
 
-(* Lemma LgetSize (P : nat -> tab -> Prop) :
-{{ fun s : tab => P (length s)  s }} 
-  getSize {{ fun s => P s}}.
-  Proof.
-  unfold getSize.
-  eapply bindRev.
-  + apply l_get. *)
-
 Lemma initPEntryI3 :
   {{fun (s : tab) => Prop2 0 s }} init_tablei3 
   {{fun _ (s : tab) => initPgoodEndI s}}.
   Proof.
   unfold init_tablei3.
-  eapply bindRev.
+  eapply sequence_rule.
   + apply LgetSize.
   + intros.
   eapply strengthen.
@@ -333,79 +236,5 @@ Lemma initPEntryI3 :
     unfold initPgoodi_inv .
     omega.
 Qed.
-
-(* Lemma initPEntryI (size : nat)  :
-  {{fun (s : tab) => Prop1 size s }} init_tablei size 
-  {{fun _ (s : tab) => initPgoodEndI s}}.
-  Proof.
-  unfold init_table0.
-  eapply strengthen.
-  eapply foreach_rule2; unfold Prop1.
-  + intros.
-    unfold changeTab.
-    eapply weaken.
-    eapply l_modify.
-    intros.
-    destruct H.
-    simpl.
-    split.
-    intuition.
-    rewrite <- H1 at 3.
-    apply LchangeElement_size2.
-    unfold initPgoodi in *.
-    intros.
-    unfold readTabEntry in *.
-    destruct H.
-    SearchAbout nth.
-    pose proof LchangeElement_nth.
-    generalize (H3 (it - 1) (it)).
-    intros.
-    apply H2.
-    apply nth_in_or_default
-    generalize (H (i + 1)).
-    intros.
-    assert (i + 1 > size).
-    omega.
-    apply H4 in H5.
-    SearchAbout nth.
-    pose proof app_nth2.
-    generalize (H6 nat [0] s 2 (i+2)).
-    intros.
-    assert ( i + 2 >= length [0] ).
-    cbn.
-    omega.
-    apply H7 in H8.
-    rewrite <- H5 at 2.
-    cbn.
-    case_eq i.
-    intros.
-    omega.
-    intros.
-    subst.
-    simpl in H8.
-    simpl in H7.
-    replace (i + 1 - 1) with i in * by omega.
-    case_eq (i + 1).
-    intros.
-    omega.
-    intros.
-    rewrite H9 in H8.
-    cbn.
-    cbn in H7.
-    pattern s in H.
-     match type of H with
-    | ?HT s => instantiate (1 := fun tt s => HT s /\ 
-                 readTabEntry 0 s = (size - it + 1 ) )
-    end.
-    simpl.
-    split.
-    assumption.
-    unfold readTabEntry.
-    cbn.
-    omega.
-    cbn.
-    intros.
-    trivial.
-  Qed. *)
 
 End ResTab.

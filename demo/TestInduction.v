@@ -31,11 +31,7 @@ Program Definition defaultIndex : State tab index :=
 
 Definition sltb (a b : index) : bool := a <? b.
 
-(* Definition geb (a b : index) : State tab bool := state_pure (b <=? a). *)
-(* Definition leb (a b : index) : State tab bool := state_pure (a <=? b). *)
 Definition ltb (a b : index) : State tab bool := state_pure (a <? b).
-(* Definition gtb (a b : index) : State tab bool := state_pure (b <? a).
-Definition eqb (a b : index) : State tab bool := state_pure (a =? b).  *)
 
 Lemma Lsltb  index1 index2 (P : bool -> tab -> Prop):
 {{ fun s : tab => P (sltb index1 index2)  s }} 
@@ -227,7 +223,7 @@ Lemma initPEntry (idx : index) :
   + intros.
     simpl.
     (* getMaxIndex *)
-    eapply bindRev.
+    eapply sequence_rule.
     - eapply weaken.
       eapply LgetMaxIndex.
       intros.
@@ -237,7 +233,7 @@ Lemma initPEntry (idx : index) :
       eassumption. *)
     - intros maxidx. simpl. 
       (* Index leb *)
-      eapply bindRev.
+      eapply sequence_rule.
       eapply weaken.
       eapply Inv_ltb.
       intros. simpl.
@@ -247,7 +243,7 @@ Lemma initPEntry (idx : index) :
       simpl.
   (* not last entry *)
   case_eq ltbindex ; intros HnotlastEntry.
-  eapply bindRev.
+  eapply sequence_rule.
   eapply weaken.
   (* on ajoute l'element idx dans le tableau *)
   eapply LaddElement.
@@ -275,7 +271,7 @@ Lemma initPEntry (idx : index) :
   omega.
   (* incrementation de idx *)
   intros [].
-  eapply bindRev.
+  eapply sequence_rule.
   eapply weaken.
   apply Lsucc.
   intros.
