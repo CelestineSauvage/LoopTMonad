@@ -6,8 +6,6 @@ Import Notations.
 
 Local Notation "f ∘ g" := (fun x => f (g x)) (at level 40, left associativity).
 
-(* Section definition. *)
-
 Class Monad (m: Type -> Type) :=
 { return_ : forall {A}, A -> m A;
   bind: forall {A}, m A -> forall {B}, (A -> m B) -> m B;
@@ -22,12 +20,6 @@ Notation "a >>= f" := (bind a f) (at level 50, left associativity) : monad_scope
 
 Open Scope monad_scope.
 
-(* Class MonadState (m: Type -> Type) `{Monad m} := {
-  get : forall S, m S;
-  put : forall S, S -> m unit;
-  run : forall {S A}, m A -> S -> (A * S); *)
-(*   hoareTriple : forall {A} (P : S -> Prop) (ma : m A) (Q : A -> S -> Prop) (s : S), P s -> let (a, s') := (run ma s) in Q a s' *)
-
 (* Monad Transformer *)
 Class MonadTrans {m} `{Monad m} (t : (Type -> Type) -> (Type -> Type)) `{Monad (t m)}  := {
   (* Lift fonction and monade transformers laws *)
@@ -40,10 +32,7 @@ Notation "m1 ;; m2" := (bind m1 (fun _ => m2))  (at level 60, right associativit
 Notation "'perf' x '<-' m ';' e" := (bind m (fun x => e))
   (at level 60, x ident, m at level 200, e at level 60) : monad_scope.
 
-(* End definition. *)
 
-
-(* Notation "a >>= f" := (bind a f) (at level 50, left associativity) : monad_scope. *)
 Open Scope monad_scope.
 Arguments Monad m : assert.
 
@@ -142,16 +131,6 @@ Global Program Instance stateM : Monad (State) :=
 Definition modify (f : S -> S) : State () :=
   getS >>= (fun s => putS (f s)).
 
-Definition hoareTripleS {A} (P : S -> Prop) (m : State A) (Q : A -> S -> Prop) : Prop :=
-  forall (s : S), P s -> let (a, s') := m s in Q a s'.
-
-(* Global Instance stateS : MonadState (State) :=
-  {  get := @getS;
-    put := @putS;
-    run := @runState;
-  }. *)
-(*     hoareTriple : @ *)
-
 End monadic_state.
 
 Section monadic_loop.
@@ -216,7 +195,6 @@ Global Program Instance LoopT_T  : MonadTrans (LoopT e):=
   Qed.
 
 Import List.
-
 
 Definition stepLoopT {e m a} `{Mo : Monad m} (body : LoopT e m a) (next : a -> m e) : m e :=
   runLoopT body (return_) next.
@@ -289,13 +267,13 @@ Definition loopeT_liftT {A} (a : m A) : LoopeT m A :=
 Definition break {A} : LoopeT m A :=
   return_ Break.
 
-Fixpoint foreach (it min : nat) (body : nat -> LoopeT m unit) : m unit :=
+Fixpoint foreach2 (it min : nat) (body : nat -> LoopeT m unit) : m unit :=
   if (it <=? min) then return_ tt
   else match it with
         | S it' => perf out <- runLoopeT (body it);
                                 match out with
                                   | Break => return_ tt
-                                  | _ => foreach it' min body
+                                  | _ => foreach2 it' min body
                                 end
         | 0 => return_ tt
        end.

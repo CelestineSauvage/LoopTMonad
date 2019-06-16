@@ -316,7 +316,7 @@ Lemma min_max_comp :
   intros.
   omega.
   Qed.
-
+(* 
 Lemma foreachT_rule2 (min max : nat) (P : nat -> St -> Prop) (body : nat -> State ())
   : min <= max -> (forall (it : nat), {{fun s => (min <= it < max) -> P it s }} body it {{fun _ => P it}}) -> 
     {{P max}} foreachT max min (fun it0 => loopT_liftT (body it0)) {{fun _ => P min}}.
@@ -358,7 +358,7 @@ Lemma foreachT_rule2 (min max : nat) (P : nat -> St -> Prop) (body : nat -> Stat
               intros [H1 [H2 H3]].
               apply H.
               split;auto.
-       Qed.
+       Qed. *)
 
 (* Lemma foreach_rule3 (min max : nat) (Inv : nat -> St -> Prop) (P : St -> Prop) (body : nat -> State ())
   : (forall (it : nat), {{fun s => Inv it s /\ P s /\ min < it <= max}} body it {{fun _ s => Inv it s /\ P s }}) -> 

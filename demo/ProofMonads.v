@@ -28,6 +28,9 @@ Definition State := M.State S.
 
 Check State.
 
+Definition hoareTripleS {A} (P : S -> Prop) (m : State A) (Q : A -> S -> Prop) : Prop :=
+  forall (s : S), P s -> let (a, s') := m s in Q a s'.
+
 Notation "{{ P }} m {{ Q }}" := (hoareTripleS P m Q)
   (at level 90, format "'[' '[' {{  P  }}  ']' '/  ' '[' m ']' '['  {{  Q  }} ']' ']'") : monad_scope.
 
@@ -36,17 +39,32 @@ Proof.
 intros s H; trivial.
 Qed.
 
-Lemma bind  (A B : Type) (m : State A) (f : A -> State B) (P : S -> Prop)( Q : A -> S -> Prop) (R : B -> S -> Prop) :
+(* Lemma bind  (A B : Type) (m : LLI A) (f : A -> LLI B) (P : state -> Prop)( Q : A -> state -> Prop) (R : B -> state -> Prop) :
+  (forall a, {{ Q a }} f a {{ R }}) -> {{ P }} m {{ Q }} -> {{ P }} perform x := m in f x {{ R }}.
+Proof. 
+intros H1 H2 s H3; unfold bind; case_eq (m s); [intros [a s'] H4 | intros k s' H4];
+apply H2 in H3; rewrite H4 in H3; trivial.
+case_eq (f a s'); [intros [b s''] H5 |  intros k s'' H5];
+apply H1 in H3; rewrite H5 in H3; trivial.
+Qed.  *)
+
+Lemma bind (A B : Type) (m : State A) (f : A -> State B) (P : S -> Prop)( Q : A -> S -> Prop) (R : B -> S -> Prop) :
   (forall a, {{ Q a }} f a {{ R }}) -> {{ P }} m {{ Q }} -> {{ P }} perf x <- m ; f x {{ R }}.
 Proof. 
-intros H1 H2 s H3.
-unfold state_bind.
+intros H1 H2 s Hs.
+unfold bind.
+simpl.
+apply H2 in Hs.
+unfold M.state_bind.
 case_eq (m s).
-intros.
-apply H2 in H3.
-case_eq (f a s0).
+intros a s' H4.
+rewrite H4 in Hs.
+apply H1 in Hs.
+case_eq (f a s').
 intros b s'' H5.
-Admitted.
+rewrite H5 in Hs.
+trivial.
+Qed.
 
 Definition wp {A : Type} (P : A -> S -> Prop) (m : State A) :=
   fun s => let (a,s') := m s in P a s'.
@@ -95,7 +113,7 @@ Proof.
 intros s H; trivial.
 Qed.
 
-Lemma bindRev (A B : Type) (m : State A) (f : A -> State B) (P : S -> Prop)( Q : A -> S -> Prop) (R : B -> S -> Prop) :
+Lemma sequence_rule (A B : Type) (m : State A) (f : A -> State B) (P : S -> Prop)( Q : A -> S -> Prop) (R : B -> S -> Prop) :
   {{ P }} m {{ Q }} -> (forall a, {{ Q a }} f a {{ R }}) -> {{ P }} perf x <- m ; f x {{ R }}.
 Proof.
 intros; eapply bind ; eassumption.
