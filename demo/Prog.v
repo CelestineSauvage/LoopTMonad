@@ -29,16 +29,35 @@ Compute runState (
   }}) init_S1.
 
 Compute runState (
+  for2 i = 5 to 0 {{
+    add_s 1
+  }}) init_S1.
+
+Compute runState (
   for i = 5 to 0 {{
     add_s i 
   }}) init_S1.
 (* 4 + 3 + 2 + 1 + 0 = 10 *)
 
 Compute runState (
+  for2 i = 5 to 0 {{
+    add_s i 
+  }}) init_S1.
+
+Compute runState (
   for i = 5 to 0 {{
     add_s i 
   }} ;; 
   for j = 5 to 0 
+  {{ 
+    add_s j 
+  }} ) init_S1.
+
+Compute runState (
+  for2 i = 5 to 0 {{
+    add_s i 
+  }} ;; 
+  for2 j = 5 to 0 
   {{ 
     add_s j 
   }} ) init_S1.
@@ -53,13 +72,24 @@ Compute runState (
   {{ 
     add_s j 
   }} ) init_S1.
+  
+Compute runState (
+  for2 i = 5 to 0 {{
+    add_s i 
+  }} ;; 
+  perf x <- get10 ;
+  add_s x ;;
+  for2 j = 5 to 0 
+  {{ 
+    add_s j 
+  }} ) init_S1.
 
 Compute runState (
-  for i = 5 to 0 {{
-    for j = 5 to 0 {{
-      add_s (i + j) 
-    }} 
-  }}) init_S1.
+   for_e i = 20 to 0 {{
+    if (i =? 15) then exit
+    else (loopT_liftT (add_s i))
+  }} ) init_S1.
+(* 19 + 18 + 17 + 16 = 70 *)
 
 Open Scope list_scope.
 
@@ -76,12 +106,11 @@ Compute runState (
   }}) init_S2.
 
 Compute runState (
-   for_e i = 20 to 0 {{
-    if (i =? 15) then exit
-    else (loopT_liftT (add_s i))
-  }} ) init_S1.
-
-(* 19 + 18 + 17 + 16 = 70 *)
+  for2 i = 5 to 0 {{
+    for2 j = 3 to 0 {{
+      addElement (i + j) 
+    }} 
+  }}) init_S2.
 
 Open Scope Z_scope.
 

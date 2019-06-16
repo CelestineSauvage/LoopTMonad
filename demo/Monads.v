@@ -271,14 +271,14 @@ Fixpoint foreach2 (it min : nat) (body : nat -> LoopeT m unit) : m unit :=
 
 End monadic_loop2.
 
-Notation "'for' i '=' min 'to' max '{{' body }}" := (foreach min max (fun i => (loopT_liftT body))) (at level 60, i ident, min at level 60,
+Notation "'for' i '=' max 'to' min '{{' body }}" := (foreach max min (fun i => (loopT_liftT body))) (at level 60, i ident, min at level 60,
 max at level 60, body at level 60, right associativity) : monad_scope.
 
-Notation "'for_e' i '=' min 'to' max '{{' body }}" := (foreach min max (fun i => (body))) (at level 60, i ident, min at level 60,
+Notation "'for_e' i '=' max 'to' min '{{' body }}" := (foreach max min (fun i => (body))) (at level 60, i ident, min at level 60,
 max at level 60, body at level 60, right associativity) : monad_scope.
 
-Notation "'for2' i '=' min 'to' max '{{' body }}" := (foreach2 min max (fun i => (loopT_liftT body))) (at level 60, i ident, min at level 60,
+Notation "'for2' i '=' max 'to' min '{{' body }}" := (foreach2 max min (fun i => (loopeT_liftT body))) (at level 60, i ident, min at level 60,
 max at level 60, body at level 60, right associativity) : monad_scope.
 
-Notation "'for2_e' i '=' min 'to' max '{{' body }}" := (foreach2 min max (fun i => (body))) (at level 60, i ident, min at level 60,
+Notation "'for2_e' i '=' max 'to' min '{{' body }}" := (foreach2 min max (fun i => (body))) (at level 60, i ident, min at level 60,
 max at level 60, body at level 60, right associativity) : monad_scope.

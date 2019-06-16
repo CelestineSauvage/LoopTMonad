@@ -91,7 +91,7 @@ Lemma LchangeElement_nth (i : nat) (n : nat) :
   Qed.
 
 Lemma LchangeElement_inf (i : nat) (n : nat) :
-  forall (l : tab) (j : nat) , j <= i < length l -> readTabEntry j (changeElement i n l) = readTabEntry j l.
+  forall (l : tab) (j : nat) , j < i < length l -> readTabEntry j (changeElement i n l) = readTabEntry j l.
   Admitted.
 
 Definition changeTab (i n: nat) : State tab unit :=
@@ -139,7 +139,7 @@ Definition initPgoodi (curidx : nat) (l : tab) : Prop :=
   forall i : nat, curidx < i < length l -> readTabEntry i l = i+1.
 
 Definition initPgoodi_inv (curidx : nat) (l : tab) : Prop :=
-  forall i : nat, i <= curidx < length l -> readTabEntry i l = i+1.
+  forall i : nat, i < curidx < length l -> readTabEntry i l = i+1.
 
 (* Definition init_table2 (size : nat) : State tab unit :=
   for_e i = maxTimeOut to 0 {{$
@@ -207,10 +207,9 @@ Lemma initPEntryI3 :
     intuition.
     assert (length (changeElement it (it + 1) s) = length s).
     apply LchangeElement_size2.
-    omega. (* 
-    intros. *)
+    omega. 
     pose proof LchangeElement_nth.
-(*     intuition. *)
+    intuition.
     assert (i < length (changeElement it (it + 1) s)) by omega.
     generalize (H3 it (it + 1) s).
     intros.
