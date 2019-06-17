@@ -108,68 +108,9 @@ Lemma LchangeTab (i : nat) (n : nat) (P : unit -> tab -> Prop) :
   assumption.
   Qed.
 
-Definition init_table (size : nat) : State tab unit :=
-  for i = size to 0 {{
-    addElement (i)
-  }}.
-
-Definition init_tablei (size : nat) : State tab unit :=
-  for i = size to 0 {{
-    changeTab (i - 1) i
-  }}.
-
-Definition init_tablei2 (size : nat) : State tab unit :=
-  for2 i = 0 to size {{
-    changeTab i (i + 1)
-  }}.
-
-Definition init_tableT (size : nat) : State tab unit :=
-  foreachT size 0 (fun i => loopT_liftT (changeTab i (i + 1))).
-
-Compute runState (init_tablei2 10) [0;0;0;0;0;0;0;0;0;0].
-
-Compute runState (init_tableT 10) [0;0;0;0;0;0;0;0;0;0].
-
-Definition init_table0 (size : nat) : State tab unit :=
-  for i = size to 0 {{
-    addElement 0
-  }}.
-
-Definition initPgoodi (curidx : nat) (l : tab) : Prop :=
-  forall i : nat, curidx < i < length l -> readTabEntry i l = i+1.
-
-Definition initPgoodi_inv (curidx : nat) (l : tab) : Prop :=
-  forall i : nat, i < curidx < length l -> readTabEntry i l = i+1.
-
-(* Definition init_table2 (size : nat) : State tab unit :=
-  for_e i = maxTimeOut to 0 {{$
-    if (
-    addElement (size - i + 1)
-  }}. *)
-
-Definition initPgoodEnd0 (l : tab) : Prop :=
-  forall i : nat, i < length l -> readTabEntry i l = 0.
-
-Definition initPgoodEndI (l : tab) : Prop :=
-  forall i : nat, i < length l -> readTabEntry i l = i + 1.
-
-Compute runState (init_tablei 10) [0;0;0;0;0;0;0;0;0;0].
-
-Definition Prop2 (n : nat) (st : tab) : Prop :=
-  (length st > n) /\ initPgoodi_inv n st.
-
 Definition getSize : State tab nat :=
   perf s <- (@get tab);
   state_pure (length s).
-
-Definition init_tablei3 : State tab unit :=
-  perf size <- getSize ;
-  for2 i = 0 to size {{
-    changeTab i (i + 1)
-  }}.
-
-Definition Prop3 (n : nat) (st : tab) : Prop :=
-  initPgoodi_inv n st.
 
 Lemma LgetSizeWp (P : nat -> tab -> Prop) :
 {{wp P getSize}} getSize {{P}}.
@@ -187,6 +128,24 @@ Lemma LgetSize P :
     intros.
     intuition.
   Qed.
+
+Definition init_tablei3 : State tab unit :=
+  perf size <- getSize ;
+  for2 i = 0 to size {{
+    changeTab i (i + 1)
+  }}.
+
+Compute runState (init_tablei3) [0;0;0;0;0;0;0;0;0;0].
+
+
+Definition initPgoodi_inv (curidx : nat) (l : tab) : Prop :=
+  forall i : nat, i < curidx < length l -> readTabEntry i l = i+1.
+
+Definition initPgoodEndI (l : tab) : Prop :=
+  forall i : nat, i < length l -> readTabEntry i l = i + 1.
+
+Definition Prop2 (n : nat) (st : tab) : Prop :=
+  (length st > n) /\ initPgoodi_inv n st.
 
 Lemma initPEntryI3 :
   {{fun (s : tab) => Prop2 0 s }} init_tablei3 

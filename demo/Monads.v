@@ -204,15 +204,6 @@ Definition exit {m a} : LoopT unit m a :=
 
 Arguments exit {_} {_}.
 
-(* Definition foreach'' {m} `{Monad m} {a} (values : list a) {c} (body : a -> LoopT unit m c) : m unit :=
-  fold_right
-    (fun x next => stepLoopT (body x) (fun _ => next))
-    (return_ tt)
-    values.
-
-Definition foreach' {m} `{Monad m} (min max : nat) {a} (body : nat -> LoopT unit m a) : m unit :=
-  foreach'' (seq min (max-min)) body. *)
-
 Fixpoint foreach {m} `{Monad m}  (it min : nat) (body : nat -> LoopT unit m unit) : m unit :=
   if (it <=? min) then return_ tt
   else match it with
