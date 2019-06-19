@@ -62,26 +62,6 @@ Lemma bind_eq : forall {A B m} `{Monad m} (a a' : m A) (f f' : A -> m B),
 
 End monadic_functions.
 
-Ltac cbnify_monad_LHS :=
-  repeat match goal with
-  | [ |- bind (return_ _) _ = _ ] => rewrite <- bind_left_unit
-  | [ |- bind (bind _ _) _ = _ ]  => rewrite <- bind_associativity
-  | [ |- _ = _ ]                  => reflexivity
-  | [ |- bind ?a ?f = _ ]         => erewrite bind_eq; intros;
-                                     [ | cbnify_monad_LHS | cbnify_monad_LHS ]
-  end.
-
-Ltac cbnify_monad :=
-  cbnify_monad_LHS;
-  apply eq_sym;
-  cbnify_monad_LHS;
-  apply eq_sym.
-
-Ltac cbn_m :=
-  repeat (try match goal with
-  [ |- bind ?a _ = bind ?a _ ] => apply bind_eq; [ reflexivity | intros ]
-  end; cbnify_monad).
-
 Section monadic_state.
 
 Variable S : Type.
@@ -260,6 +240,23 @@ Fixpoint foreach2 (it min : nat) (body : nat -> LoopeT m unit) : m unit :=
                                 end
         | 0 => return_ tt
        end.
+
+(* Program Fixpoint range (from to : Z) {measure (Z.abs_nat (to - from))} : list Z :=
+  if Z_lt_dec from to
+  then from :: range (from + 1) to
+  else [].
+Next Obligation. apply Zabs_nat_lt; auto with zarith. Qed. *)
+
+Program Fixpoint foreach3 (from to : Z) (body : Z -> LoopeT m unit) {measure (Z.abs_nat (to - from))} : m unit :=
+  if Z_lt_dec from to
+  then perf out <- runLoopeT (body from);
+                                match out with
+                                  | Break => return_ tt
+                                  | _ => foreach3 (from + 1) to body
+                                end
+  else return_ tt.
+Next Obligation. 
+apply Zabs_nat_lt; auto with zarith. Qed.
 
 End monadic_loop2.
 
