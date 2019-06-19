@@ -41,7 +41,7 @@ Qed.
 
 Lemma bind (A B : Type) (m : State A) (f : A -> State B) (P : S -> Prop)( Q : A -> S -> Prop) (R : B -> S -> Prop) :
   (forall a, {{ Q a }} f a {{ R }}) -> {{ P }} m {{ Q }} -> {{ P }} perf x <- m ; f x {{ R }}.
-Proof. 
+Proof.
 intros H1 H2 s Hs.
 unfold bind.
 simpl.
@@ -114,9 +114,9 @@ Lemma weaken (A : Type) (m : State A) (P Q : S -> Prop) (R : A -> S -> Prop) :
   {{ Q }} m {{ R }} -> (forall s, P s -> Q s) -> {{ P }} m {{ R }}.
 Proof.
 intros H1 H2 s H3.
-apply H2 in H3. 
+apply H2 in H3.
 apply H1 in H3.
-assumption. 
+assumption.
 Qed.
 
 Lemma modify f (P : () -> S -> Prop) : {{ fun s => P tt (f s) }} modify f {{ P }}.

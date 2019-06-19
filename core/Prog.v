@@ -15,6 +15,8 @@ Definition init_val1 := 0.
 
 Definition init_S1 : nat := init_val1.
 
+Print modify.
+
 Definition add_s (i : nat) : M.State nat unit :=
   M.modify (fun s => s + i).
 
@@ -35,53 +37,53 @@ Compute runState (
 
 Compute runState (
   for i = 5 to 0 {{
-    add_s i 
+    add_s i
   }}) init_S1.
 (* 4 + 3 + 2 + 1 + 0 = 10 *)
 
 Compute runState (
   for2 i = 5 to 0 {{
-    add_s i 
+    add_s i
   }}) init_S1.
 
 Compute runState (
   for i = 5 to 0 {{
-    add_s i 
-  }} ;; 
-  for j = 5 to 0 
-  {{ 
-    add_s j 
+    add_s i
+  }} ;;
+  for j = 5 to 0
+  {{
+    add_s j
   }} ) init_S1.
 
 Compute runState (
   for2 i = 5 to 0 {{
-    add_s i 
-  }} ;; 
-  for2 j = 5 to 0 
-  {{ 
-    add_s j 
+    add_s i
+  }} ;;
+  for2 j = 5 to 0
+  {{
+    add_s j
   }} ) init_S1.
 
 Compute runState (
   for i = 5 to 0 {{
-    add_s i 
-  }} ;; 
+    add_s i
+  }} ;;
   perf x <- get10 ;
   add_s x ;;
-  for j = 5 to 0 
-  {{ 
-    add_s j 
+  for j = 5 to 0
+  {{
+    add_s j
   }} ) init_S1.
-  
+
 Compute runState (
   for2 i = 5 to 0 {{
-    add_s i 
-  }} ;; 
+    add_s i
+  }} ;;
   perf x <- get10 ;
   add_s x ;;
-  for2 j = 5 to 0 
-  {{ 
-    add_s j 
+  for2 j = 5 to 0
+  {{
+    add_s j
   }} ) init_S1.
 
 Compute runState (
@@ -101,15 +103,15 @@ Definition addElement (val : nat) : State (list nat) unit :=
 Compute runState (
   for i = 5 to 0 {{
     for j = 3 to 0 {{
-      addElement (i + j) 
-    }} 
+      addElement (i + j)
+    }}
   }}) init_S2.
 
 Compute runState (
   for2 i = 5 to 0 {{
     for2 j = 3 to 0 {{
-      addElement (i + j) 
-    }} 
+      addElement (i + j)
+    }}
   }}) init_S2.
 
 Open Scope Z_scope.
@@ -127,8 +129,8 @@ Definition init_Z1 : Z := 0.
 Compute runState (
   for i = 6 to 0 {{
     if (Z.eqb (Z.modulo (Z.of_nat i) 2) 0) then
-      add_z i 
-    else 
+      add_z i
+    else
       minus_z i
   }}
   ) init_Z1.

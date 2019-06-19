@@ -67,7 +67,7 @@ Ltac cbnify_monad_LHS :=
   | [ |- bind (return_ _) _ = _ ] => rewrite <- bind_left_unit
   | [ |- bind (bind _ _) _ = _ ]  => rewrite <- bind_associativity
   | [ |- _ = _ ]                  => reflexivity
-  | [ |- bind ?a ?f = _ ]         => erewrite bind_eq; intros; 
+  | [ |- bind ?a ?f = _ ]         => erewrite bind_eq; intros;
                                      [ | cbnify_monad_LHS | cbnify_monad_LHS ]
   end.
 
@@ -118,7 +118,7 @@ Global Program Instance stateM : Monad (State) :=
   destruct (a x).
   reflexivity.
   Qed.
-  
+
   Next Obligation.
   intros.
   unfold state_bind.
@@ -139,7 +139,7 @@ Definition LoopT e m a : Type := (forall (r : Type), (e -> m r) -> (a -> m r) ->
 
 Definition runLoopT {m e a r} (loop : LoopT e m a) : (e -> m r) -> (a -> m r) -> m r :=
   fun exit next => loop r exit next.
-(* 
+(*
 Check runLoopT. *)
 
 Arguments runLoopT {_} {_} {_} {_}.
@@ -180,7 +180,7 @@ Global Program Instance LoopT_T  : MonadTrans (LoopT e):=
   rewrite <- bind_left_unit.
   reflexivity.
   Qed.
-  
+
   Next Obligation.
   intros;cbn.
   unfold loopT_liftT.
@@ -211,6 +211,7 @@ Fixpoint foreach {m} `{Monad m}  (it min : nat) (body : nat -> LoopT unit m unit
       | 0 => return_ tt
     end.
 
+(* Fonction qui appelle une fois le corps de la boucle *)
 Definition once {m} `{Monad m} {a} (body : LoopT unit m a) : m unit :=
 stepLoopT body (fun _ => return_ tt).
 
@@ -238,7 +239,7 @@ Definition loopeT_pure {A} (a : A) : LoopeT m A :=
 
 Definition loopeT_bind  {A} (x : LoopeT m A) {B} (k : A -> LoopeT m B) : LoopeT m B :=
     perf o <- runLoopeT x;
-    match o with 
+    match o with
       | Break => return_ Break
       | Atom y => runLoopeT (k y)
     end.
