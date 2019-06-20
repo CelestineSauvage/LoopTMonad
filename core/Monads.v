@@ -318,39 +318,45 @@ Global Program Instance loopeT_M  {m} `{Monad m} : Monad (LoopeT m) :=
   unfold loopeT_pure.
   unfold loopeT_bind.
   unfold runLoopeT.
-  unfold LoopeT in a.
   generalize (bind_right_unit (Action A) a).
   intros.
   rewrite H0 at 1.
-  assert (forall o : Action A, match o with
+(*   assert (forall o : Action A, match o with
           | Break => return_ Break
           | Continue => return_ Continue
           | Atom y => return_ (Atom y)
           end = return_ o).
   intros.
-  case o ; auto.
-  apply f_equal.
-  symmetry.
+  case o ; auto. *)
+  f_equal.
   apply functional_extensionality.
-  auto.
+  intros.
+  case x ; auto.
   Qed.
 
   Next Obligation.
   unfold loopeT_pure.
   unfold loopeT_bind.
   unfold runLoopeT.
-  unfold LoopeT in a.
-  
-  rewrite <- H1.
-  assert ((fun o : Action A =>
-   match o with
-   | Break => return_ Break
-   | Continue => return_ Continue
-   | Atom y => return_ (Atom y)
-   end = return_)).
-  assert (bind a return_ = (@bind m H (Action A) a (Action A) return_)).
-  case_eq (@return_ (Action A)).
-  refine .
+  unfold LoopeT in f.
+  pose proof bind_left_unit.
+  generalize (H0 A a (Action B) f).
+  intros.
+  pose proof bind_right_unit.
+(*   rewrite H1 at 1. *)
+  pose proof bind_associativity.
+  pose proof actionM_obligation_2.
+  assert (bind (return_ a) f = bind (return_ (Atom a)) (fun _ => f a)).
+  + cbn.
+  rewrite equal_f .
+(*   case_eq (f (return_ a)). *)
+  rewrite H2 at 1.
+  refine 
+  case o ; auto.
+  apply f_equal.
+  apply functional_extensionality.
+  auto.
+  Qed.
 
 
 (* Definition loopeT_bind  {A} (x : LoopeT m A) {B} (k : A -> LoopeT m B) : LoopeT m B :=
