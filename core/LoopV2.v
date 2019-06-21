@@ -217,12 +217,6 @@ Definition loopT_bind  {A} (x : LoopT A) {B} (k : A -> LoopT B) : LoopT B :=
       | Atom y => runLoopT (k y)
     end.
 
-Lemma Lbind_right_unit: forall A (a: LoopT A), a = loopT_bind a loopT_pure.
-Proof.
-unfold loopT_bind.
-intros.
-unfold state_bind.
-case (runLoopT a s).
 
 Definition loopT_liftT {A} (a : State A) : LoopT A :=
   state_liftM (@Atom A) a.

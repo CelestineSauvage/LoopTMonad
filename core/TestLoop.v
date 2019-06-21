@@ -246,7 +246,7 @@ Lemma initPEntryI2 (size : nat) :
     split.
     
  Qed. *)
-
+  
 Definition getSize : State tab nat :=
   perf s <- (@get tab);
   state_pure (length s).
