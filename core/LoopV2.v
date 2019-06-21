@@ -217,6 +217,13 @@ Definition loopT_bind  {A} (x : LoopT A) {B} (k : A -> LoopT B) : LoopT B :=
       | Atom y => runLoopT (k y)
     end.
 
+Lemma Lbind_right_unit: forall A (a: LoopT A), a = loopT_bind a loopT_pure.
+Proof.
+unfold loopT_bind.
+intros.
+unfold state_bind.
+case (runLoopT a s).
+
 Definition loopT_liftT {A} (a : State A) : LoopT A :=
   state_liftM (@Atom A) a.
 
@@ -316,7 +323,7 @@ Lemma min_max_comp :
   omega.
   Qed.
 
-Lemma foreachT_rule2 (min max : nat) (P : nat -> St -> Prop) (body : nat -> State ())
+(* Lemma foreachT_rule2 (min max : nat) (P : nat -> St -> Prop) (body : nat -> State ())
   : min <= max -> (forall (it : nat), {{fun s => P it s /\ (min <= it <= max)}} body it {{fun _ => P it}}) -> 
     {{P max}} foreachT max min (fun it0 => loopT_liftT (body it0)) {{fun _ => P min}}.
     Proof.
@@ -357,7 +364,7 @@ Lemma foreachT_rule2 (min max : nat) (P : nat -> St -> Prop) (body : nat -> Stat
               intros [H1 [H2 H3]].
               apply H.
               split;auto.
-       Qed.
+       Qed. *)
 
 (* Lemma foreach_rule3 (min max : nat) (Inv : nat -> St -> Prop) (P : St -> Prop) (body : nat -> State ())
   : (forall (it : nat), {{fun s => Inv it s /\ P s /\ min < it <= max}} body it {{fun _ s => Inv it s /\ P s }}) -> 
