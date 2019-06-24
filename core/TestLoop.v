@@ -124,7 +124,7 @@ Definition init_tablei2 (size : nat) : State tab unit :=
   }}.
 
 Definition init_tableT (size : nat) : State tab unit :=
-  foreachT size 0 (fun i => loopT_liftT (changeTab i (i + 1))).
+  foreach size 0 (fun i => loopT_liftT (changeTab i (i + 1))).
 
 Compute runState (init_tablei2 10) [0;0;0;0;0;0;0;0;0;0].
 

@@ -372,13 +372,6 @@ Fixpoint foreach2 {m} `{Monad m}(it min : nat) (body : nat -> LoopeT m unit) : m
         | 0 => return_ tt
        end.
 
-(* Program Fixpoint range (from to : Z) {measure (Z.abs_nat (to - from))} : list Z :=
-  if Z_lt_dec from to
-  then from :: range (from + 1) to
-  else [].
-Next Obligation. apply Zabs_nat_lt; auto with zarith. Qed. *)
-
-
 Program Fixpoint foreach3 {m} `{Monad m} (from to : Z) (body : Z -> LoopeT m unit) {measure (Z.abs_nat (to - from))} : m unit :=
   if Z_lt_dec from to
   then perf out <- runLoopeT (body from);
