@@ -43,7 +43,7 @@ Section monadic_functions.
  Definition wbind {A: Type} (ma: m A) {B: Type} (mb: m B) :=
  ma >>= fun  _=>mb.
 
- Definition liftM {A B: Type} (f: A->B) (ma: m A): m B :=
+ Definition liftM {A B: Type} (f: A -> B) (ma: m A): m B :=
  ma >>= (fun  a => return_ (f a)).
 
  Definition join {A: Type} (mma: m (m A)): m A :=
@@ -278,20 +278,6 @@ Definition runLoopeT {m A} (loop : LoopeT m A) : m (Action A) :=
 
 Definition loopeT_pure {m} `{Monad m} {A} (a : A) : LoopeT m A :=
   return_ (Atom a).
-(*   @return_ m _ _ (return_ a). *)
-
-(* Definition loopeT_bind {m} `{Monad m} {A} (ma : LoopeT m A) {B} (f : A -> LoopeT m B)
-                        : LoopeT m B.
-Proof.
-unfold LoopeT in *.
-exact (perf oa <- ma; 
-         match oa with
-         | Break => return_ Break
-         | Continue => return_ Continue
-         | Atom a => f a
-         end
-  ).
-Defined. *)
 
 Definition loopeT_bind {m} `{Monad m} {A} (x : LoopeT m A) {B} (k : A -> LoopeT m B) : LoopeT m B :=
     perf o <- runLoopeT x;
@@ -303,18 +289,6 @@ Definition loopeT_bind {m} `{Monad m} {A} (x : LoopeT m A) {B} (k : A -> LoopeT 
 
 Arguments Monad m : assert.
 
-(* Class Monad (m: Type -> Type) :=
-{ return_ : forall {A}, A -> m A;
-  bind: forall {A}, m A -> forall {B}, (A -> m B) -> m B;
-  bind_right_unit: forall A (a: m A), a = bind a return_;
-  bind_left_unit: forall A (a: A) B (f: A -> m B),
-             f a = bind (return_ a) f;
-  bind_associativity: forall A (ma: m A) B f C (g: B -> m C),
-                 bind ma (fun  x=> bind (f x) g) = bind (bind ma f) g
-}. *)
-
-Print bind.
-
 Global Program Instance loopeT_M  {m} `{Monad m} : Monad (LoopeT m) :=
   { return_ := @loopeT_pure m _;
     bind := @loopeT_bind m _  }.
@@ -325,13 +299,6 @@ Global Program Instance loopeT_M  {m} `{Monad m} : Monad (LoopeT m) :=
   generalize (bind_right_unit (Action A) a).
   intros.
   rewrite H0 at 1.
-(*   assert (forall o : Action A, match o with
-          | Break => return_ Break
-          | Continue => return_ Continue
-          | Atom y => return_ (Atom y)
-          end = return_ o).
-  intros.
-  case o ; auto. *)
   f_equal.
   apply functional_extensionality.
   intros.
@@ -370,7 +337,7 @@ Definition loopeT_liftT {m} `{Monad m} {A} (a : m A) : LoopeT m A :=
 
 Global Program Instance LoopeT_T {m} `{Monad m} : MonadTrans (LoopeT):=
   { liftT := @loopeT_liftT m _}.
-  Next Obligation.
+(*   Next Obligation.
   unfold loopeT_liftT.
   unfold loopeT_pure.
   unfold liftM.
@@ -389,7 +356,7 @@ Global Program Instance LoopeT_T {m} `{Monad m} : MonadTrans (LoopeT):=
   extensionality x.
   rewrite <- bind_left_unit.
   reflexivity.
-  Qed.
+  Qed. *)
 
 Definition break {m A} `{Monad m} : LoopeT m A :=
   return_ Break.
@@ -435,7 +402,7 @@ max at level 60, body at level 60, right associativity) : monad_scope.
 Notation "'for2' i '=' max 'to' min '{{' body }}" := (foreach2 max min (fun i => (loopeT_liftT body))) (at level 60, i ident, min at level 60,
 max at level 60, body at level 60, right associativity) : monad_scope.
 
-Notation "'for2_e' i '=' max 'to' min '{{' body }}" := (foreach2 min max (fun i => (body))) (at level 60, i ident, min at level 60,
+Notation "'for2_e' i '=' max 'to' min '{{' body }}" := (foreach2 max min (fun i => (body))) (at level 60, i ident, min at level 60,
 max at level 60, body at level 60, right associativity) : monad_scope.
 
 Notation "'for3' i '=' min 'to' max '{{' body }}" := (foreach3 min max (fun i => (loopeT_liftT body))) (at level 60, i ident, min at level 60,

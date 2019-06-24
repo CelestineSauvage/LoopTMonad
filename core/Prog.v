@@ -91,7 +91,37 @@ Compute runState (
     if (i =? 15) then exit
     else (loopT_liftT (add_s i))
   }} ) init_S1.
+
+Definition fonct : State nat unit :=
+   for_e i = 20 to 0 {{
+    if (i =? 15) then exit
+    else (loopT_liftT (add_s i))
+  }}.
+
+Lemma test : 
+  {{fun _ => True}} fonct {{fun _ _ => True}}.
+  unfold fonct.
+(*   simpl. *)
+  eapply sequence_rule. 
+  Admitted.
 (* 19 + 18 + 17 + 16 = 70 *)
+
+Definition fonct2 : State nat unit :=
+   for2_e i = 20 to 0 {{
+    if (i =? 15) then break
+    else (loopeT_liftT (add_s i))
+  }}.
+
+Compute runState (
+  for2_e i = 20 to 0 {{
+    if (i =? 15) then break
+    else (loopeT_liftT (add_s i))
+  }} ) init_S1.
+
+Lemma test2 :
+  {{fun _ => True}} fonct2 {{fun a s => a = a /\ s = s}}.
+  unfold fonct2.
+  vm_compute.
 
 Open Scope list_scope.
 
