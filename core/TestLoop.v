@@ -108,32 +108,26 @@ Lemma LchangeTab (i : nat) (n : nat) (P : unit -> tab -> Prop) :
   assumption.
   Qed.
 
+Definition getSize : State tab nat :=
+  perf s <- (@get tab);
+  state_pure (length s).
+
 Definition init_table (size : nat) : State tab unit :=
   for i = size to 0 {{
     addElement (i)
   }}.
 
-Definition init_tablei (size : nat) : State tab unit :=
+Definition init_tablei : State tab unit :=
+  perf size <- getSize ;
   for i = size to 0 {{
     changeTab (i - 1) i
   }}.
 
-Definition init_tablei2 (size : nat) : State tab unit :=
+(* Definition init_tablei2 (size : nat) : State tab unit :=
   for2 i = 0 to size {{
     changeTab i (i + 1)
   }}.
-
-Definition init_tableT (size : nat) : State tab unit :=
-  foreach size 0 (fun i => loopT_liftT (changeTab i (i + 1))).
-
-Compute runState (init_tablei2 10) [0;0;0;0;0;0;0;0;0;0].
-
-Compute runState (init_tableT 10) [0;0;0;0;0;0;0;0;0;0].
-
-Definition init_table0 (size : nat) : State tab unit :=
-  for i = size to 0 {{
-    addElement 0
-  }}.
+ *)
 
 Definition initPgoodi (curidx : nat) (l : tab) : Prop :=
   forall i : nat, curidx < i < length l -> readTabEntry i l = i+1.
@@ -141,21 +135,12 @@ Definition initPgoodi (curidx : nat) (l : tab) : Prop :=
 Definition initPgoodi_inv (curidx : nat) (l : tab) : Prop :=
   forall i : nat, i <= curidx < length l -> readTabEntry i l = i+1.
 
-(* Definition init_table2 (size : nat) : State tab unit :=
-  for_e i = maxTimeOut to 0 {{$
-    if (
-    addElement (size - i + 1)
-  }}. *)
-
-Definition initPgoodEnd0 (l : tab) : Prop :=
-  forall i : nat, i < length l -> readTabEntry i l = 0.
-
 Definition initPgoodEndI (l : tab) : Prop :=
   forall i : nat, i < length l -> readTabEntry i l = i + 1.
 
-Compute runState (init_tablei 10) [0;0;0;0;0;0;0;0;0;0].
+Compute runState (init_tablei) [0;0;0;0;0;0;0;0;0;0].
 
-Lemma initPEntry (size : nat)  :
+(* Lemma initPEntry (size : nat)  :
   {{fun (s : tab) => initPgoodi size s /\ (length s > size)}} init_tablei size 
   {{fun _ (s : tab) => initPgoodEndI s}}.
   Proof.
@@ -181,12 +166,12 @@ Lemma initPEntry (size : nat)  :
       end.
       simpl.
       destruct H as (Hinit & Hlen).
-(*       
-    unfold initPgoodi in H.
-    intuition.
-    cbn.
-    eapply *)
-  Admitted.  
+      split.
+      * unfold initPgoodi.
+        intuition.
+      cbn.
+      eapply
+  Admitted.   *)
  
 Definition Prop1 (n : nat) (st : tab) : Prop :=
   (length st = n) /\ initPgoodi n st.
@@ -194,15 +179,39 @@ Definition Prop1 (n : nat) (st : tab) : Prop :=
 Definition Prop2 (n : nat) (st : tab) : Prop :=
   (length st > n) /\ initPgoodi_inv n st.
 
-Lemma initPEntryI2 (size : nat) :
-  {{fun (s : tab) => Prop2 0 s }} init_tablei2 size 
+Definition Prop3 (n : nat) (st : tab) : Prop :=
+  initPgoodi_inv n st.
+
+Lemma LgetSizeWp (P : nat -> tab -> Prop) :
+{{wp P getSize}} getSize {{P}}.
+  Proof.
+  eapply wpIsPrecondition.
+  Qed.
+
+Lemma LgetSize P : 
+{{ fun s => P s }} getSize 
+{{ fun size s => P s /\ size = length s }}.
+  Proof.
+    eapply weaken.
+    eapply LgetSizeWp.
+    cbn.
+    intros.
+    intuition.
+  Qed.
+
+Lemma initPEntryI2 :
+  {{fun (s : tab) => Prop3 (length s) s }} init_tablei 
   {{fun _ (s : tab) => initPgoodEndI s}}.
   Proof.
   unfold init_tablei.
-  eapply strengthen.
-  eapply foreach2_rule2; unfold Prop2 in *.
+  eapply bindRev.
+  + apply LgetSize.
   + intros.
-    unfold Prop2.
+  eapply strengthen.
+(*   pose proof foreach23.
+  pose proof foreach2_rule3. *)
+  eapply foreach23. unfold Prop2 in *.
+    unfold Prop3.
     eapply weaken.
     eapply l_modify.
     intros.
@@ -246,10 +255,7 @@ Lemma initPEntryI2 (size : nat) :
     split.
     
  Qed. *)
-  
-Definition getSize : State tab nat :=
-  perf s <- (@get tab);
-  state_pure (length s).
+
 
 Definition init_tablei3 : State tab unit :=
   perf size <- getSize ;
@@ -257,33 +263,6 @@ Definition init_tablei3 : State tab unit :=
     changeTab i (i + 1)
   }}.
 
-Definition Prop3 (n : nat) (st : tab) : Prop :=
-  initPgoodi_inv n st.
-
-Lemma LgetSizeWp (P : nat -> tab -> Prop) :
-{{wp P getSize}} getSize {{P}}.
-  Proof.
-  eapply wpIsPrecondition.
-  Qed.
-
-Lemma LgetSize P : 
-{{ fun s => P s }} getSize 
-{{ fun size s => P s /\ size = length s }}.
-  Proof.
-    eapply weaken.
-    eapply LgetSizeWp.
-    cbn.
-    intros.
-    intuition.
-  Qed.
-
-(* Lemma LgetSize (P : nat -> tab -> Prop) :
-{{ fun s : tab => P (length s)  s }} 
-  getSize {{ fun s => P s}}.
-  Proof.
-  unfold getSize.
-  eapply bindRev.
-  + apply l_get. *)
 
 Lemma initPEntryI3 :
   {{fun (s : tab) => Prop2 0 s }} init_tablei3 
