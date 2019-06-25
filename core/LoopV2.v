@@ -224,17 +224,6 @@ Definition loopT_liftT {A} (a : State A) : LoopT A :=
 Definition break {A} : LoopT A :=
   state_pure Break.
 
-Fixpoint foreach_blup (it min : nat) (body : nat -> LoopT ()) : State () :=
-  if (it <=? min) then state_pure tt
-  else match it with
-        | S it' => perf out <- runLoopT (body it');
-                                match out with
-                                  | Break => state_pure tt
-                                  | _ => foreach_blup it' min body
-                                end
-        | 0 => state_pure tt
-       end.
-
 Fixpoint foreach (it min : nat) (body : nat -> LoopT ()) : State () :=
   if (it <=? min) then state_pure tt
   else match it with
@@ -327,6 +316,59 @@ Lemma foreach_rule2 (min max : nat) (P : nat -> St -> Prop) (body : nat -> State
            omega.
        Qed.
 
+Lemma foreachmin_rule2 (min max : nat) (P : nat -> St -> Prop) (body : nat -> State ())
+  : (forall (it : nat), {{fun s => P it s /\ (min < it < max)}} body it {{fun _ => P (it - 1)}}) /\ min < max ->
+    {{P (max) }} foreach max min (fun it0 => loopT_liftT (body it0)) {{fun _ => P min}}.
+    Proof.
+    intros [Hleq Hmaxmin].
+    induction max.
+     + assert (min = 0) by omega.
+      replace min with 0.
+      intros s Hs.
+      simpl.
+      auto.
+    + unfold foreach.
+      case_eq (S max <=? min);intros Hm.
+      - intros s HP.
+        simpl.
+        rewrite Nat.leb_le in Hm.
+        intuition.
+      - eapply bindRev .
+        unfold runLoopT.
+        unfold loopT_liftT.
+        unfold state_liftM.
+        eapply bindRev.
+        unfold hoareTripleS in Hleq.
+          unfold hoareTripleS.
+          intros st H2.
+          generalize (Hleq (S max)).
+          intros Hmax.
+          eapply Hmax;split; auto.
+          rewrite Nat.leb_nle in Hm.
+          intuition. omega.
+        intros [].
+          apply act_ret.
+      * intros. cbn.
+        replace (max - 0) with (max) by omega.
+        apply IHmax.
+         ++ intros it s'.
+            intros [H1 [H2 H3]].
+            apply Hleq.
+            split;auto.
+        ++ rewrite Nat.leb_nle in Hm.
+           omega.
+       Qed.
+
+Fixpoint foreach_min (it min : nat) (body : nat -> LoopT ()) : State () :=
+  if (it <=? min) then state_pure tt
+  else match it with
+        | S it' => perf out <- runLoopT (body it');
+                                match out with
+                                  | Break => state_pure tt
+                                  | _ => foreach_min it' min body
+                                end
+        | 0 => state_pure tt
+       end.
 
 (* Lemma foreach2_rule3 (min max : nat) (Inv : nat -> St -> Prop) (P : St -> Prop) (body : nat -> State ())
   : (forall (it : nat), {{fun s => Inv it s /\ P s /\ min <= it < max}} body it {{fun _ s => Inv it s /\ P s }}) -> 
