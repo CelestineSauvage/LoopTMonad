@@ -225,16 +225,20 @@ Fixpoint endmax_list (max : nat) (l : list nat) : bool :=
     | a :: l' => prop_endmax_list max l'
   end. *)
 
-Lemma foreach_rule_plus (min max : nat) (P : nat -> St -> Prop) (body : nat -> State () ):
-  forall (l: list nat), (ordered_list l /\ (startmin_list min l = true) /\ (endmax_list max l = true)) ->
+Lemma foreach_rule_plus (P : nat -> St -> Prop) (body : nat -> State () ):
+  forall (l: list nat) (min max : nat), (ordered_list l /\ (startmin_list min l = true) /\ (endmax_list max l = true)) ->
     (forall (it : nat), {{fun s => P it s /\ (min <= it < max)}} body it {{fun _ => P (S it)}}) ->
-    {{P min}} foreach3' l (fun it0 => loopeT_liftT (body it0)) {{fun _ => P (max)}} .
+    {{P min}} foreach3' l (fun it0 => loopeT_liftT (body it0)) {{fun _ => P max}} .
     Proof.
-    intros max.
-    induction max; intros min [Hminmax Hles].
-    + admit.
-    + unfold M.foreach3_st.
-      unfold M.foreach3.
+    intros l.
+    induction l; intros min max [Hord [Hsmin Hemax]] Hit.
+    + unfold startmin_list in Hsmin.
+      contradict Hsmin.
+      auto.
+    + generalize (IHl (S a) max).
+      intros IHla.
+      unfold M.foreach3'.
+      eapply sequence_rule.
       unfold M.foreach3_func.
       cbn.
       case_eq (lt_dec min (S max));intros Hm Hdec.
