@@ -375,19 +375,11 @@ Fixpoint foreach2 {m} `{Monad m}(it min : nat) (body : nat -> LoopeT m unit) : m
         | 0 => return_ tt
        end.
 
-Fixpoint foreach2_st (it min : nat) (body : nat -> LoopeT (State St) unit) : (State St) unit :=
-  if (it <=? min) then return_ tt
-  else match it with
-        | S it' => perf out <- runLoopeT (body it);
-                                match out with
-(*                                   | Break => return_ tt *)
-                                  | _ => foreach2_st it' min body
-                                end
-        | 0 => return_ tt
-       end.
+Definition foreach2_st (it min : nat) (body : nat -> LoopeT (State St) unit) : (State St) unit :=
+  foreach2 it min body.
 
-Program Fixpoint foreach3 {m} `{Monad m} (from to : Z) (body : Z -> LoopeT m unit) {measure (Z.abs_nat (to - from))} : m unit :=
-  if Z_lt_dec from to
+Program Fixpoint foreach3 {m} `{Monad m} (from to : nat) (body : nat -> LoopeT m unit) {measure (to - from)} : m unit :=
+  if lt_dec from to
   then perf out <- runLoopeT (body from);
                                 match out with
                                   | Break => return_ tt
@@ -395,23 +387,10 @@ Program Fixpoint foreach3 {m} `{Monad m} (from to : Z) (body : Z -> LoopeT m uni
                                 end
   else return_ tt.
 Next Obligation. 
-apply Zabs_nat_lt. auto with zarith. Qed.
-
-Program Fixpoint range (from to : nat) {measure (to - from)} : list nat :=
-  if lt_dec from to
-  then from :: range (from + 1) to
-  else [].
-Next Obligation.
 omega. Qed.
 
-Program Fixpoint foreach3_st (from to : nat) (body : nat -> LoopeT (State St) unit) {measure (to - from)} : (State St) unit :=
-  if lt_dec from to
-  then perf out <- runLoopeT (body from);
-                                match out with
-(*                                   | Break => state_pure tt *)
-                                  | _ => foreach3_st (from + 1) to body
-                                end
-  else state_pure tt.
+Definition foreach3_st (from to : nat) (body : nat -> LoopeT (State St) unit) : (State St) unit :=
+  foreach3 from to body.
 
 End monad_loop2.
 
