@@ -1,4 +1,4 @@
-Require Import Program Monads Omega ZArith.
+Require Import Program Monads Omega.
 
 Set Implicit Arguments.
 
@@ -30,6 +30,10 @@ Check State.
 
 Definition hoareTripleS {A} (P : St -> Prop) (m : State A) (Q : A -> St -> Prop) : Prop :=
   forall (s : St), P s -> let (a, s') := m s in Q a s'.
+
+Notation "m1 ;; m2" := (state_bind m1 (fun _ => m2))  (at level 60, right associativity) : monad_scope.
+Notation "'perf' x '<-' m ';' e" := (state_bind m (fun x => e))
+  (at level 60, x ident, m at level 200, e at level 60) : monad_scope.
 
 Notation "{{ P }} m {{ Q }}" := (hoareTripleS P m Q)
   (at level 90, format "'[' '[' {{  P  }}  ']' '/  ' '[' m ']' '['  {{  Q  }} ']' ']'") : monad_scope.
@@ -119,6 +123,13 @@ apply H1 in H3.
 assumption.
 Qed.
 
+Lemma strengthen (A : Type) (m : State A) (P: St -> Prop) (Q R: A -> St -> Prop) :
+  {{ P }} m {{ R }} -> (forall s a, R a s -> Q a s) -> {{ P }} m {{ Q }}.
+Proof.
+intros H1 H2 s H3.
+apply H1 in H3.
+Admitted.
+
 Lemma modify f (P : () -> St -> Prop) : {{ fun s => P tt (f s) }} modify f {{ P }}.
 Proof.
 unfold modify.
@@ -150,6 +161,7 @@ Lemma foreach_rule (min max : nat) (P : nat -> St -> Prop) (body : nat -> State 
       simpl.
       auto.
     + unfold M.foreach2_st.
+      unfold M.foreach2.
       case_eq (S max <=? min);intros Hm.
       - intros s HP.
         cbn.
@@ -162,15 +174,13 @@ Lemma foreach_rule (min max : nat) (P : nat -> St -> Prop) (body : nat -> State 
         unfold loopeT_liftT.
         unfold liftM.
         eapply sequence_rule.
-(*         unfold hoareTripleS in Hleq.
-          unfold hoareTriple. *)
-          intros st H2.
-          generalize (Hleq (S max)).
-          intros Hmax.
-          eapply Hmax;split; auto.
-          rewrite Nat.leb_nle in Hm. omega.
+        intros st H2.
+        generalize (Hleq (S max)).
+        intros Hmax.
+        eapply Hmax;split; auto.
+        rewrite Nat.leb_nle in Hm. omega.
         intros [].
-          apply act_ret.
+        apply act_ret.
       * intros. cbn.
         replace (max - 0) with (max) by omega.
         apply IHmax.
@@ -182,23 +192,67 @@ Lemma foreach_rule (min max : nat) (P : nat -> St -> Prop) (body : nat -> State 
            omega.
        Qed.
 
-Open Scope Z.
+Open Scope list_scope.
 
-Lemma foreach_ruleZ (min max : Z) (P : Z -> St -> Prop) (body : Z -> State () ):
-  0 <= min <= max /\ (forall (it : Z), {{fun s => P it s /\ (min < it <= max)}} body it {{fun _ => P (it + 1)}})  ->
-    {{P min}} M.foreach3_st min max (fun it0 => loopeT_liftT (body it0)) {{fun _ => P max}}.
+Inductive ordered_list : list nat -> Prop :=
+  ord_nil : ordered_list nil
+  | ord_one : forall a : nat, ordered_list [a]
+  | ord_CC : forall a b : nat, b = (S a) -> (forall l, ordered_list  l -> ordered_list (a::b::l)). 
+
+Definition startmin_list (min: nat) (l : list nat) : bool :=
+  match l with 
+    | [] => false
+    | a :: l' => if (a =? min) then true else false
+  end.
+
+(* Definition prop_startmin_list (min : nat) (l : list nat) : Prop :=
+   match l with 
+    | [] => False
+    | a :: l' => if (a =? min) then True else False
+  end.
+ *)
+Fixpoint endmax_list (max : nat) (l : list nat) : bool :=
+   match l with 
+    | [] => false
+    | a :: [] => true
+    | a :: l' => endmax_list max l'
+  end.
+
+(* Fixpoint prop_endmax_list (max : nat) (l : list nat) : Prop :=
+   match l with 
+    | [] => False
+    | a :: [] => True
+    | a :: l' => prop_endmax_list max l'
+  end. *)
+
+Lemma foreach_rule_plus (min max : nat) (P : nat -> St -> Prop) (body : nat -> State () ):
+  forall (l: list nat), (ordered_list l /\ (startmin_list min l = true) /\ (endmax_list max l = true)) ->
+    (forall (it : nat), {{fun s => P it s /\ (min <= it < max)}} body it {{fun _ => P (S it)}}) ->
+    {{P min}} foreach3' l (fun it0 => loopeT_liftT (body it0)) {{fun _ => P (max)}} .
     Proof.
-    intros [Hleq Hmaxmin].
-    induction max.
-    + assert (min = 0) by omega.
-      replace min with 0.
-      intros s Hs.
-      simpl.
-      auto.
+    intros max.
+    induction max; intros min [Hminmax Hles].
+    + admit.
     + unfold M.foreach3_st.
-      unfold M.foreach3_st_func.
-      case_eq (Z.pos p <=? min);intros Hm.
+      unfold M.foreach3.
+      unfold M.foreach3_func.
+      cbn.
+      case_eq (lt_dec min (S max));intros Hm Hdec.
+      - eapply sequence_rule. 
+        eapply sequence_rule.
+        intros st H2.
+        generalize (Hles min).
+        intros Hmin.
+        eapply Hmin;split; auto.
+        intros [].
+        apply act_ret.
+     intros. cbn.
+     generalize (IHmax (S min)).
+     intros.
+     eapply strengthen.
+     eapply IHmax.
 
+ 
 (* Lemma foreach3_rule (min max : Z) (P : Z -> St -> Prop) (body : Z -> State ())
   : (forall (it : Z), 
     {{fun s => P it s /\ (min < it <= max)}} 

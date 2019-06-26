@@ -369,7 +369,7 @@ Fixpoint foreach2 {m} `{Monad m}(it min : nat) (body : nat -> LoopeT m unit) : m
   else match it with
         | S it' => perf out <- runLoopeT (body it);
                                 match out with
-                                  | Break => return_ tt
+(*                                   | Break => return_ tt *)
                                   | _ => foreach2 it' min body
                                 end
         | 0 => return_ tt
@@ -378,19 +378,14 @@ Fixpoint foreach2 {m} `{Monad m}(it min : nat) (body : nat -> LoopeT m unit) : m
 Definition foreach2_st (it min : nat) (body : nat -> LoopeT (State St) unit) : (State St) unit :=
   foreach2 it min body.
 
-Program Fixpoint foreach3 {m} `{Monad m} (from to : nat) (body : nat -> LoopeT m unit) {measure (to - from)} : m unit :=
-  if lt_dec from to
-  then perf out <- runLoopeT (body from);
-                                match out with
-                                  | Break => return_ tt
-                                  | _ => foreach3 (from + 1) to body
-                                end
-  else return_ tt.
-Next Obligation. 
-omega. Qed.
+Fixpoint foreach3' {m} `{Monad m} (fromto : list nat) (body : nat -> LoopeT m unit) : m unit :=
+  match fromto with
+  | [] => return_ tt
+  | it :: fromto' => perf out <- runLoopeT (body it); foreach3' (fromto') body
+  end.
 
-Definition foreach3_st (from to : nat) (body : nat -> LoopeT (State St) unit) : (State St) unit :=
-  foreach3 from to body.
+Definition foreach3 (from to : nat) (body : nat -> LoopeT (State St) unit) : (State St) unit :=
+  foreach3' (seq from (from - to)) body.
 
 End monad_loop2.
 
