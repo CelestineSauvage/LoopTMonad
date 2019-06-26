@@ -48,7 +48,13 @@ Lemma LchangeElement_size1 (l : tab)  :
 
 Lemma LchangeElement_size2 (l : tab)  :
   forall (i n : nat), length (changeElement i n l) = length l.
-  Admitted.
+  Proof.
+  unfold changeElement.
+  induction l.
+  intros.
+  - cbn.
+    
+  Qed.
 
 Lemma LchangeElement_in (i : nat) (n : nat) :
   forall (l : tab)  , i < length l -> In n (changeElement i n l).
@@ -233,7 +239,7 @@ Lemma initPEntryI2 :
     eapply weaken.
     unfold changeTab.
     eapply l_modify.
-    intros s [Hgood [Hlen Hit]].
+    intros s [Hgood [Hlen1 Hit]].
     unfold initPgoodi in *.
     split.
     * intros index Hindex.
@@ -246,7 +252,7 @@ Lemma initPEntryI2 :
             assert ( length (changeElement (it - 1) it s) = length s).
             apply LchangeElement_size2.
             omega.
-    * rewrite Hlen.
+    * rewrite Hlen1.
       symmetry.
       apply LchangeElement_size2.
   - simpl.

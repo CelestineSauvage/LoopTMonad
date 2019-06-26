@@ -118,10 +118,10 @@ Compute runState (
     else (loopeT_liftT (add_s i))
   }} ) init_S1.
 
-Lemma test2 :
+(* Lemma test2 :
   {{fun _ => True}} fonct2 {{fun a s => a = a /\ s = s}}.
   unfold fonct2.
-  vm_compute.
+  vm_compute. *)
 
 Open Scope list_scope.
 
@@ -148,22 +148,27 @@ Open Scope Z_scope.
 
 (* if/else *)
 
-Definition add_z (i : nat) : M.State Z unit :=
-  M.modify (fun s => s + Z.of_nat i).
+Definition add_z (i : Z) : M.State Z unit :=
+  M.modify (fun s => s + i).
 
-Definition minus_z (i : nat) : M.State Z unit :=
-  M.modify (fun s => s - Z.of_nat i).
+Definition minus_z (i : Z) : M.State Z unit :=
+  M.modify (fun s => s - i).
 
 Definition init_Z1 : Z := 0.
 
-Compute runState (
+(* Compute runState (
   for i = 6 to 0 {{
     if (Z.eqb (Z.modulo (Z.of_nat i) 2) 0) then
       add_z i
     else
       minus_z i
   }}
-  ) init_Z1.
+  ) init_Z1. *)
+
+Compute runState (
+  for3 i = 0 to 5 {{
+    add_z i
+  }}) init_Z1.
 
 End Test.
  *)
