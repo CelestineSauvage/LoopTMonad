@@ -39,6 +39,11 @@ Proof.
 intros s H; trivial.
 Qed.
 
+Lemma unit_ret `{State unit} (P : St -> Prop) : {{ P }} return_ tt {{fun _ => P }}.
+Proof.
+intros s H; trivial.
+Qed.
+
 Lemma bind (A B : Type) (m : State A) (f : A -> State B) (P : St -> Prop)( Q : A -> St -> Prop) (R : B -> St -> Prop) :
   (forall a, {{ Q a }} f a {{ R }}) -> {{ P }} m {{ Q }} -> {{ P }} perf x <- m ; f x {{ R }}.
 Proof.
@@ -188,20 +193,94 @@ Lemma foreach_rule (min max : nat) (P : nat -> St -> Prop) (body : nat -> State 
            omega.
        Qed.
 
+Lemma foreach_no_it (body : nat -> State () ) :
+  forall min max : nat, min >= max -> M.foreach2_st max min (fun it0 => loopeT_liftT (body it0)) = return_ tt.
+  Proof.
+  intros.
+  induction max; auto.
+  apply functional_extensionality.
+  intro x.
+  unfold M.foreach2_st.
+  unfold M.foreach2.
+  case_eq (S max <=? min).
+  + intros.
+    auto.
+  + intros.
+    rewrite Nat.leb_nle in H0.
+    omega.
+ Qed.
+
 Open Scope list_scope.
 
-Check StronglySorted.
+Lemma foreach_plus_no_it (body : nat -> State () ) :
+  forall min max : nat, min >= max -> M.foreach3 min max (fun it0 => loopeT_liftT (body it0)) = return_ tt.
+  Proof.
+  intros.
+  unfold foreach3.
+  assert (max - min = 0).
+  omega.
+  assert (List.seq min (max - min) = nil).
+  + pose proof List.seq_length.
+    rewrite H0.
+    generalize (H1 0 min).
+    intros.
+    cbn in *.
+    auto. 
+  + rewrite H1.
+    cbn.
+    auto.
+  Qed.
+
+Lemma foreach'_plus_no_it (body : nat -> State () ) :
+  forall max : nat, M.foreach3' [] (fun it0 => loopeT_liftT (body it0)) = return_ tt.
+  Proof.
+  intros.
+  cbn.
+  auto.
+  Qed.
+
+Lemma foreach_rule_noit  (P : nat -> St -> Prop) (body : nat -> State () ):
+    forall min max : nat, min >= max ->
+    {{P max}} M.foreach2_st max min (fun it => loopeT_liftT (body it)) {{fun _ => P max}}.
+    Proof.
+    intros min max Hm.
+    rewrite foreach_no_it; auto.
+    intros s H.
+    trivial.
+    Qed.
+
+Lemma foreach_rule_plus_no_it (P : nat -> St -> Prop) (body : nat -> State () ) :
+  forall min max : nat, min >= max -> {{P max}} M.foreach3 min max 
+    (fun it0 => loopeT_liftT (body it0)) {{fun _ => P max}}.
+  Proof.
+  intros min max Hm.
+  rewrite foreach_plus_no_it; auto.
+  intros s H; trivial.
+  Qed.
+
+Lemma foreach'_rule_plus_no_it (P : nat -> St -> Prop) (body : nat -> State () ) :
+  forall max : nat, {{P max}} M.foreach3' [] 
+    (fun it0 => loopeT_liftT (body it0)) {{fun _ => P max}}.
+  Proof.
+  intros min max Hm.
+  rewrite foreach'_plus_no_it; auto.
+  Qed.
+
+Definition is_succ (a b : nat) : Prop :=
+  S a = b.
+
+Inductive HdRel (a : nat) : list nat -> Prop :=
+  | HdRel_nil : HdRel a [S a]
+  | HdRel_cons b l: is_succ a b -> HdRel a (b :: l).
+
+Inductive ordered_list : list nat -> Prop :=
+    | ordered_list_one a : ordered_list [a]
+    | ordered_list_cons a l : ordered_list l -> HdRel a l -> ordered_list (a :: l).
 
 (* Inductive ordered_list : list nat -> Prop :=
-  ord_nil : ordered_list nil
   | ord_one : forall a : nat, ordered_list (a :: nil)
   | ord_CC l: forall a b : nat,
   ordered_list (b :: l) -> b = (S a) -> ordered_list (a::b::l). *)
-
-Definition Dsucc (a b : nat) : Prop :=
-  b = S a.
-
-Definition ordered_list := @Sorted nat Dsucc.
 
 Definition startmin_list (min: nat) (l : list nat) : bool :=
   match l with 
@@ -215,6 +294,16 @@ Fixpoint endmax_list (max : nat) (l : list nat) : bool :=
     | a :: [] => true
     | a :: l' => endmax_list max l'
   end.
+
+Lemma ordered_noempty (l : list nat) :
+  ordered_list l -> length l > 0.
+  Proof.
+  intros.
+  induction H.
+  + constructor.
+  + cbn.
+    auto.
+  Qed.
 
 Lemma startmin_noempty (l : list nat) :
   forall min, startmin_list min (l) = true -> length l > 0.
@@ -263,14 +352,8 @@ Lemma min_max_l :
     +  *)
   Admitted.
 
-
-Lemma a_ord_list (l : list nat) :
-  forall (a : nat), ordered_list (a :: l) -> ordered_list l /\ HdRel Dsucc a l.
-  Proof.
-  intros.
-  apply Sorted_inv.
-  apply H.
-  Qed.
+(* Lemma ordered_list (l : list nat) :=
+ordered_list (a :: l) /\ startmin_list min (a :: l) = true -> startmin_list (S a) l = true *)
 
 (* Definition prop_startmin_list (min : nat) (l : list nat) : Prop :=
    match l with 
@@ -285,16 +368,19 @@ Lemma a_ord_list (l : list nat) :
     | a :: [] => True
     | a :: l' => prop_endmax_list max l'
   end. *)
+Close Scope list_scope.
+
+Open Scope nat_scope.
 
 Lemma foreach_rule_plus (P : nat -> St -> Prop) (body : nat -> State () ):
-  forall (l: list nat) (min max : nat), 
+  forall (l: list nat) (min max : nat), min < max -> 
   (forall (it : nat), {{fun s => P it s /\ (min <= it < max)}} body it {{fun _ => P (S it)}})
-  -> ordered_list l -> (startmin_list min l = true) -> (endmax_list max l = true) 
+  -> ordered_list l -> (startmin_list min l = true) /\ (endmax_list (max - 1) l = true) 
      ->
     {{P min}} foreach3' l (fun it0 => loopeT_liftT (body it0)) {{fun _ => P max}} .
     Proof.
     intros l.
-    induction l; intros min max Hit Hord Hsmin Hemax.
+    induction l; intros min max Hminmax Hit Hord [Hsmin Hsmax].
     + unfold startmin_list in Hsmin.
       contradict Hsmin.
       auto.
@@ -312,24 +398,49 @@ Lemma foreach_rule_plus (P : nat -> St -> Prop) (body : nat -> State () ):
           generalize (Hit a).
           intros Ha.
           eapply Ha;split; try rewrite Hamin; auto.
-          cbn.
+(*           cbn.
           split; try omega.
-          rewrite Hamin in Hord, Hsmin, Hemax.
+          rewrite Hamin in Hord, Hsmin, Hsmax.
           eapply min_max_l with (min :: l).
-          auto.
+          auto. *)
         * intros [].
           apply act_ret.
-      - intros. cbn.
-        apply IHl.
-        * intro.
-          apply weaken with (fun s : St => P it s /\ min <= it < max).
-          apply Hit.
-          intros s [Hb Hc];split; auto.
-          rewrite Hamin in Hc.
-          omega.
-        * split.
-          ++ admit.
-          ++ apply a_endmin_list with a;split;auto.
+      - intros.
+        rewrite Hamin.
+        case_eq (S min <? max); intros.
+        * rewrite Nat.ltb_lt in H.
+           apply IHl.
+          ++ omega.
+          ++ intro.
+            apply weaken with (fun s : St => P it s /\ min <= it < max).
+            apply Hit.
+            intros s [Hb Hc];split; auto; try omega.
+          ++ assert (startmin_list (S min) (l)).
+          -- eapply a_ord_list.
+            apply Hord.
+          ++ split.
+             assert (startmin_list (S a) l = true).
+               admit.
+               assert (length l > 0).
+               apply startmin_noempty with (S a).
+               auto.
+               cbn.
+        * rewrite Nat.ltb_nlt in H.
+          assert (S min = max) by omega.
+          rewrite H0.
+          assert (l = nil) by admit.
+          rewrite H1.
+          intros s Hs.
+          auto.
+Qed.
+
+Lemma foreach_rule_plus2 (P : nat -> St -> Prop) (body : nat -> State () ):
+  forall (min max : nat) (l: list nat) , 
+  (forall (it : nat), {{fun s => P it s /\ (min <= it < max)}} body it {{fun _ => P (S it)}})
+  -> length l > 0 -> ordered_list l -> (startmin_list min l = true) -> (endmax_list max l = true) 
+     ->
+    {{P min}} foreach3' l (fun it0 => loopeT_liftT (body it0)) {{fun _ => P max}} .
+    Proof.
 
  
 (* Lemma foreach3_rule (min max : Z) (P : Z -> St -> Prop) (body : Z -> State ())

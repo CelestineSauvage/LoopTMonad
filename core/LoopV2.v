@@ -476,9 +476,11 @@ Lemma foreach_rule2 (min max : nat) (P : nat -> St -> Prop) (body : nat -> State
       intros.
     Admitted. *)
 
-Lemma foreach_break_rule (min max : nat) (P : St -> Prop) (body : nat -> State ())
-  : forall (cond : bool), (forall (it : nat), {{fun s => P s /\ (min <= it <= max) /\ (cond = true) }} body it {{fun _ => P}}) -> 
-    {{P}} foreach max min (fun it0 => if (negb cond) then break else loopT_liftT (body it0)) {{fun _ s => P s /\ cond = false}}.
+Lemma foreach_break_rule (min max : nat) (Inv : nat -> St -> Prop) (body : nat -> State ())
+  : forall (cond : State bool), (forall (it : nat), 
+  {{fun s => Inv it s /\ (min <= it < max) /\ (cond s = false) }} body it {{fun _ => Inv (it + 1) s}}) -> 
+    {{Inv min s}} foreach min max (fun it0 => if_monadic (cond)
+       then_monadic break else_monadic (loopT_liftT (body it0)) {{fun _ s => Inv max s /\ cond s = true}}.
   Admitted.
 
 Notation "'for' i '=' max 'to' min '{{' body }}" := (foreach max min (fun i => (loopT_liftT body))) (at level 60, i ident, min at level 60,

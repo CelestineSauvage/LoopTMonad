@@ -385,7 +385,7 @@ Fixpoint foreach3' {m} `{Monad m} (fromto : list nat) (body : nat -> LoopeT m un
   end.
 
 Definition foreach3 (from to : nat) (body : nat -> LoopeT (State St) unit) : (State St) unit :=
-  foreach3' (seq from (from - to)) body.
+  foreach3' (seq from (to - from)) body.
 
 End monad_loop2.
 
