@@ -269,31 +269,30 @@ Lemma foreach'_rule_plus_no_it (P : nat -> St -> Prop) (body : nat -> State () )
 Definition is_succ (a b : nat) : Prop :=
   S a = b.
 
-Inductive HdRel (a : nat) : list nat -> Prop :=
-  | HdRel_nil : HdRel a [S a]
-  | HdRel_cons b l: is_succ a b -> HdRel a (b :: l).
+Inductive HdSel (a : nat) : list nat -> Prop :=
+  | HdSel_nil : HdSel a [S a]
+  | HdSel_cons b l: is_succ a b -> HdSel a (b :: l).
 
 Inductive ordered_list : list nat -> Prop :=
     | ordered_list_one a : ordered_list [a]
-    | ordered_list_cons a l : ordered_list l -> HdRel a l -> ordered_list (a :: l).
+    | ordered_list_cons a l : ordered_list l -> HdSel a l -> ordered_list (a :: l).
 
-(* Inductive ordered_list : list nat -> Prop :=
-  | ord_one : forall a : nat, ordered_list (a :: nil)
-  | ord_CC l: forall a b : nat,
-  ordered_list (b :: l) -> b = (S a) -> ordered_list (a::b::l). *)
-
-Definition startmin_list (min: nat) (l : list nat) : bool :=
+Definition startmin_list (min: nat) (l : list nat) : Prop :=
   match l with 
-    | [] => false
-    | a :: l' => (a =? min)
+    | [] => False
+    | a :: l' => (a = min)
   end.
 
-Fixpoint endmax_list (max : nat) (l : list nat) : bool :=
+Fixpoint endmax_list (max : nat) (l : list nat) : Prop :=
    match l with 
-    | [] => false
-    | a :: [] => true
+    | [] => False
+    | a :: [] => True
     | a :: l' => endmax_list max l'
   end.
+
+Lemma nextmin_ord_list (min : nat):
+  forall l, (length l) > 0 /\ ordered_list (min :: l) -> startmin_list (S min) l.
+  Admitted.
 
 Lemma ordered_noempty (l : list nat) :
   ordered_list l -> length l > 0.
@@ -306,7 +305,7 @@ Lemma ordered_noempty (l : list nat) :
   Qed.
 
 Lemma startmin_noempty (l : list nat) :
-  forall min, startmin_list min (l) = true -> length l > 0.
+  forall min, startmin_list min (l) -> length l > 0.
   Proof.
   intros.
   induction l.
@@ -316,16 +315,15 @@ Lemma startmin_noempty (l : list nat) :
   Qed.
 
 Lemma a_startmin_list (min : nat) (l : list nat) :
-  forall (a : nat), startmin_list min (a :: l) = true -> a = min.
+  forall (a : nat), startmin_list min (a :: l) -> a = min.
   Proof.
   cbn.
   intros.
-  rewrite Nat.eqb_eq in H.
   auto.
   Qed.
 
 Lemma a_endmin_list (max: nat) (l : list nat) :
-  forall (a : nat), length l > 0 /\ endmax_list max (a :: l) = true -> endmax_list max l = true.
+  forall (a : nat), length l > 0 /\ endmax_list max (a :: l) -> endmax_list max l.
   Proof.
   intros a [H1 H2].
   induction l.
@@ -334,26 +332,6 @@ Lemma a_endmin_list (max: nat) (l : list nat) :
   + cbn.
     auto.
   Qed.
-
-Lemma min_max_l :
-  forall (l: list nat) (min max : nat) , 
-  ordered_list l /\ (startmin_list min l = true) /\ (endmax_list max l = true) -> min < max.
-  Proof.
-(*   intro l.
-  induction l.
-  * cbn.
-    intuition.
-  * intros min max [H1 [H2 H3]].
-    assert (Hamin : a = min).
-    apply a_startmin_list in H2.
-    auto.
-    rewrite Hamin in H1, H2, H3.
-    induction min.
-    +  *)
-  Admitted.
-
-(* Lemma ordered_list (l : list nat) :=
-ordered_list (a :: l) /\ startmin_list min (a :: l) = true -> startmin_list (S a) l = true *)
 
 (* Definition prop_startmin_list (min : nat) (l : list nat) : Prop :=
    match l with 
@@ -375,7 +353,7 @@ Open Scope nat_scope.
 Lemma foreach_rule_plus (P : nat -> St -> Prop) (body : nat -> State () ):
   forall (l: list nat) (min max : nat), min < max -> 
   (forall (it : nat), {{fun s => P it s /\ (min <= it < max)}} body it {{fun _ => P (S it)}})
-  -> ordered_list l -> (startmin_list min l = true) /\ (endmax_list (max - 1) l = true) 
+  -> ordered_list l -> (startmin_list min l) /\ (endmax_list (max - 1) l) 
      ->
     {{P min}} foreach3' l (fun it0 => loopeT_liftT (body it0)) {{fun _ => P max}} .
     Proof.
@@ -383,7 +361,6 @@ Lemma foreach_rule_plus (P : nat -> St -> Prop) (body : nat -> State () ):
     induction l; intros min max Hminmax Hit Hord [Hsmin Hsmax].
     + unfold startmin_list in Hsmin.
       contradict Hsmin.
-      auto.
     + assert (Hamin : a = min).
       apply a_startmin_list in Hsmin.
       auto.
@@ -398,24 +375,19 @@ Lemma foreach_rule_plus (P : nat -> St -> Prop) (body : nat -> State () ):
           generalize (Hit a).
           intros Ha.
           eapply Ha;split; try rewrite Hamin; auto.
-(*           cbn.
-          split; try omega.
-          rewrite Hamin in Hord, Hsmin, Hsmax.
-          eapply min_max_l with (min :: l).
-          auto. *)
         * intros [].
           apply act_ret.
       - intros.
-        rewrite Hamin.
+        rewrite Hamin in *.
         case_eq (S min <? max); intros.
         * rewrite Nat.ltb_lt in H.
            apply IHl.
           ++ omega.
           ++ intro.
-            apply weaken with (fun s : St => P it s /\ min <= it < max).
-            apply Hit.
-            intros s [Hb Hc];split; auto; try omega.
-          ++ assert (startmin_list (S min) (l)).
+             apply weaken with (fun s : St => P it s /\ min <= it < max).
+             apply Hit.
+             intros s [Hb Hc];split; auto; try omega.
+          ++ assert (startmin_list (S min) (l) = true) by admit.
           -- eapply a_ord_list.
             apply Hord.
           ++ split.
