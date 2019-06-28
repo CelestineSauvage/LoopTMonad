@@ -292,7 +292,14 @@ Fixpoint endmax_list (max : nat) (l : list nat) : Prop :=
 
 Lemma nextmin_ord_list (min : nat):
   forall l, (length l) > 0 /\ ordered_list (min :: l) -> startmin_list (S min) l.
-  Admitted.
+  Proof.
+  induction min.
+  intros l [Hlen Hord].
+  + assert (forall l',  HdSel 0 (1 :: l')).
+    - constructor.
+      unfold is_succ.
+      omega.
+    -
 
 Lemma ordered_noempty (l : list nat) :
   ordered_list l -> length l > 0.
@@ -381,13 +388,20 @@ Lemma foreach_rule_plus (P : nat -> St -> Prop) (body : nat -> State () ):
         rewrite Hamin in *.
         case_eq (S min <? max); intros.
         * rewrite Nat.ltb_lt in H.
+(*           case_eq (S min <? (max - 1)).
+          2 : {
+            intros.
+            rewrite Nat.ltb_nlt in H0.
+            assert (S min = max - 1) by omega.
+            cbn in H1. *)
            apply IHl.
           ++ omega.
           ++ intro.
              apply weaken with (fun s : St => P it s /\ min <= it < max).
              apply Hit.
              intros s [Hb Hc];split; auto; try omega.
-          ++ assert (startmin_list (S min) (l) = true) by admit.
+          ++  
+             assert (startmin_list (S min) l) by admit.
           -- eapply a_ord_list.
             apply Hord.
           ++ split.
