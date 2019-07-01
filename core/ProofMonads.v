@@ -273,6 +273,14 @@ Inductive HdSel (a : nat) : list nat -> Prop :=
   | HdSel_nil : HdSel a [S a]
   | HdSel_cons b l: is_succ a b -> HdSel a (b :: l).
 
+Lemma HdSel_inv :
+  forall a b l, HdSel a (b :: l) -> is_succ a b.
+  Proof.
+  intros a b l Hs.
+  inversion Hs; auto.
+  unfold is_succ;auto.
+  Qed.
+
 Inductive ordered_list : list nat -> Prop :=
     | ordered_list_one a : ordered_list [a]
     | ordered_list_cons a l : ordered_list l -> HdSel a l -> ordered_list (a :: l).
@@ -290,17 +298,32 @@ Fixpoint endmax_list (max : nat) (l : list nat) : Prop :=
     | a :: l' => endmax_list max l'
   end.
 
-Lemma nextmin_ord_list (min : nat):
-  forall l, (length l) > 0 /\ ordered_list (min :: l) -> startmin_list (S min) l.
-  Proof.
-  induction min.
-  intros l [Hlen Hord].
-  + assert (forall l',  HdSel 0 (1 :: l')).
-    - constructor.
-      unfold is_succ.
-      omega.
-    -
+Locate Sorted_inv.
 
+Lemma Sorted_inv :
+    forall a l, length l > 0 -> ordered_list (a :: l) -> ordered_list l /\ HdSel a l.
+    Proof.
+    intros a l H Hord.
+    inversion Hord;auto.
+    rewrite <- H2 in H; cbn in *; intuition.
+    Qed.
+
+Lemma nextmin_ord_list (min : nat):
+  forall l, length l > 0 /\ ordered_list (min :: l) -> startmin_list (S min) l.
+  Proof.
+  induction l; intros [Hlen Hord].
+  + cbn in *; intuition.
+  + intuition.
+    eapply Sorted_inv in Hord; auto.
+    destruct Hord.
+    eapply HdSel_inv in H1.
+    assert (a = S min).
+    unfold is_succ in H1.
+    auto.
+    rewrite H2.
+    unfold startmin_list; auto.
+  Qed.
+    
 Lemma ordered_noempty (l : list nat) :
   ordered_list l -> length l > 0.
   Proof.
