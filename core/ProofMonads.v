@@ -298,7 +298,25 @@ Fixpoint endmax_list (max : nat) (l : list nat) : Prop :=
     | a :: l' => endmax_list max l'
   end.
 
-Locate Sorted_inv.
+(* Lemma seq_NoDup len start : List.NoDup (List.seq start len).
+  Proof.
+   revert start.
+   induction len.
+   + simpl. 
+   constructor. trivial.
+   rewrite in_seq. intros (H,_). apply (Lt.lt_irrefl _ H).
+  Qed. *)
+
+SearchAbout List.NoDup.
+
+(* Lemma ord_NoDup:
+  forall l, ordered_list l -> List.NoDup l.
+  Proof.
+  intros.
+  induction l.
+  + constructor;auto.
+  + apply List.NoDup_cons.
+    -   *)
 
 Lemma Sorted_inv :
     forall a l, length l > 0 -> ordered_list (a :: l) -> ordered_list l /\ HdSel a l.
@@ -307,6 +325,16 @@ Lemma Sorted_inv :
     inversion Hord;auto.
     rewrite <- H2 in H; cbn in *; intuition.
     Qed.
+
+Lemma Sorted_rect :
+    forall (a : nat) (P : list nat -> Type),
+      P [a] ->
+      (forall a l, ordered_list l -> P l -> HdSel a l -> P (a :: l)) ->
+      forall l:list nat, ordered_list l -> P l.
+  Proof.
+    induction l; firstorder using Sorted_inv.
+    cbn in H.
+  Qed.
 
 Lemma nextmin_ord_list (min : nat):
   forall l, length l > 0 -> ordered_list (min :: l) -> startmin_list (S min) l.
@@ -336,6 +364,20 @@ Lemma Sorted_list_no_empty :
   + cbn.
     omega.
   Qed.
+      
+(* Lemma Sorted_list_empty :
+  forall val l, 
+    (startmin_list val l /\ endmax_list val l /\ ordered_list l)
+    -> l = val :: [].
+  Proof.
+  intros val l [Hst [Hend Hord]].
+  induction l.
+  + cbn in *.
+    intuition.
+  + assert (val = a).
+    unfold startmin_list in Hst.
+    auto.
+    apply Sorted_inv in Hord. *)
 
 Lemma ordered_noempty (l : list nat) :
   ordered_list l -> length l > 0.
@@ -374,12 +416,17 @@ Lemma a_endmin_list (max: nat) (l : list nat) :
     intuition.
   + cbn.
     auto.
-  Qed.
+  Qed. 
 
+Lemma a_endmax_list :
+  forall a l, ordered_list (a :: l) /\ endmax_list a (a :: l) -> l = [].
+  Proof.
+  
+  Admitted.
 
-Close Scope list_scope.
+Open Scope list_scope.
 
-Open Scope nat_scope.
+(* Open Scope nat_scope. *)
 
 Lemma foreach_rule_plus (P : nat -> St -> Prop) (body : nat -> State () ):
   forall (l: list nat) (min max : nat), min < max -> 
@@ -412,6 +459,12 @@ Lemma foreach_rule_plus (P : nat -> St -> Prop) (body : nat -> State () ):
         rewrite Hamin in *.
         case_eq (S min <? max); intros.
         * rewrite Nat.ltb_lt in H.
+          assert (startmin_list (S min) l).
+          apply nextmin_ord_list; auto. 
+          apply Sorted_list_no_empty with min max;auto.
+          assert (length l > 0).
+          apply Sorted_list_no_empty with min max;auto.
+          apply a_endmin_list in Hsmax; auto.
 (*           case_eq (S min <? (max - 1)).
           2 : {
             intros.
@@ -424,37 +477,16 @@ Lemma foreach_rule_plus (P : nat -> St -> Prop) (body : nat -> State () ):
              apply weaken with (fun s : St => P it s /\ min <= it < max).
              apply Hit.
              intros s [Hb Hc];split; auto; try omega.
-          ++ assert (startmin_list (S min) l).
-             -- apply nextmin_ord_list; auto. 
-                 apply Sorted_list_no_empty with min max.
-                 auto.
-                 auto.
-             -- apply Sorted_inv with min.
-                apply startmin_noempty in H0; auto.
-                auto.
-          ++ split.
-             apply nextmin_ord_list; auto.
-             apply Sorted_list_no_empty with min max;auto.
-             apply a_endmin_list in Hsmax; auto.
-             assert (startmin_list (S min) l).
-             apply nextmin_ord_list; auto. 
-             apply Sorted_list_no_empty with min max.
-             auto.
-             auto.
-             apply startmin_noempty in H0; auto.
-             auto.
-          ++ split.
-             assert (startmin_list (S a) l = true).
-               admit.
-               assert (length l > 0).
-               apply startmin_noempty with (S a).
-               auto.
-               cbn.
+          ++ apply Sorted_inv with min; auto.
+          ++ split; auto.
         * rewrite Nat.ltb_nlt in H.
+          assert (min = max - 1) by omega.
+          rewrite <- H0 in Hsmax.
           assert (S min = max) by omega.
-          rewrite H0.
-          assert (l = nil) by admit.
           rewrite H1.
+          assert (l = []).
+          apply a_endmax_list with min;auto.
+          rewrite H2.
           intros s Hs.
           auto.
 Qed.
