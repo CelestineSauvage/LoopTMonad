@@ -269,27 +269,42 @@ Lemma foreach'_rule_plus_no_it (P : nat -> St -> Prop) (body : nat -> State () )
 Definition is_succ (a b : nat) : Prop :=
   S a = b.
 
-Inductive HdSel (a : nat) : list nat -> Prop :=
-  | HdSel_nil : HdSel a [S a]
-  | HdSel_cons b l: is_succ a b -> HdSel a (b :: l).
+Check HdRel.
+
+Definition HdSel := HdRel (is_succ).
+(* Inductive HdSel (a : nat) : list nat -> Prop :=
+  | HdSel_nil : HdSel a []
+  | HdSel_cons b l: is_succ a b -> HdSel a (b :: l). *)
 
 Lemma HdSel_inv :
   forall a b l, HdSel a (b :: l) -> is_succ a b.
   Proof.
   intros a b l Hs.
   inversion Hs; auto.
-  unfold is_succ;auto.
   Qed.
 
-Inductive ordered_list : list nat -> Prop :=
-    | ordered_list_one a : ordered_list [a]
-    | ordered_list_cons a l : ordered_list l -> HdSel a l -> ordered_list (a :: l).
+(* Inductive Ordered_list : list nat -> Prop :=
+    | Ordered_list_nil : Ordered_list []
+    | Ordered_list_cons a l : Ordered_list l -> HdSel a l -> Ordered_list (a :: l). *)
+Definition Ordered_list := @Sorted nat is_succ.
+
+(* Effective computation for ordered_list *)
+Fixpoint ordered_list (l : list nat) : bool :=
+  match l with
+    | [] => true
+    | [a] => true
+    | a ::((b::_) as l') =>  if (S a =? b) then ordered_list l' else false
+  end.
 
 Definition startmin_list (min: nat) (l : list nat) : Prop :=
   match l with 
     | [] => False
     | a :: l' => (a = min)
   end.
+
+(* Inductive Endmax_list : nat -> list nat -> Prop :=
+  | Endmax_one a : Endmax_list a [a]
+  | Endmax_cons a l: forall b, Endmax_list a l -> Endmax_list a (b :: l) *)
 
 Fixpoint endmax_list (max : nat) (l : list nat) : Prop :=
    match l with 
@@ -298,46 +313,33 @@ Fixpoint endmax_list (max : nat) (l : list nat) : Prop :=
     | a :: l' => endmax_list max l'
   end.
 
-(* Lemma seq_NoDup len start : List.NoDup (List.seq start len).
-  Proof.
-   revert start.
-   induction len.
-   + simpl. 
-   constructor. trivial.
-   rewrite in_seq. intros (H,_). apply (Lt.lt_irrefl _ H).
-  Qed. *)
-
 SearchAbout List.NoDup.
 
-(* Lemma ord_NoDup:
-  forall l, ordered_list l -> List.NoDup l.
-  Proof.
-  intros.
-  induction l.
-  + constructor;auto.
-  + apply List.NoDup_cons.
-    -   *)
-
 Lemma Sorted_inv :
-    forall a l, length l > 0 -> ordered_list (a :: l) -> ordered_list l /\ HdSel a l.
+    forall a l, Ordered_list (a :: l) -> Ordered_list l /\ HdSel a l.
     Proof.
-    intros a l H Hord.
+    intros a l Hord.
     inversion Hord;auto.
-    rewrite <- H2 in H; cbn in *; intuition.
     Qed.
 
-Lemma Sorted_rect :
-    forall (a : nat) (P : list nat -> Type),
-      P [a] ->
-      (forall a l, ordered_list l -> P l -> HdSel a l -> P (a :: l)) ->
-      forall l:list nat, ordered_list l -> P l.
+Lemma hdsel_to_trans :
+  forall a b, is_succ a b -> a < b.
   Proof.
-    induction l; firstorder using Sorted_inv.
-    cbn in H.
+  intros a b.
+  induction b; intros; unfold is_succ in H; omega.
+  Qed.
+
+Lemma sortedone_to_sorted :
+  forall l, Ordered_list l -> @Sorted nat lt l.
+  Proof.
+  induction 1 as [|? ? ? ? HForall]; constructor; trivial.
+  destruct HForall; constructor; trivial.
+  unfold is_succ in H0.
+  omega.
   Qed.
 
 Lemma nextmin_ord_list (min : nat):
-  forall l, length l > 0 -> ordered_list (min :: l) -> startmin_list (S min) l.
+  forall l, length l > 0 -> Ordered_list (min :: l) -> startmin_list (S min) l.
   Proof.
   induction l; intros Hlen Hord.
   + cbn in *; intuition.
@@ -354,7 +356,7 @@ Lemma nextmin_ord_list (min : nat):
 
 Lemma Sorted_list_no_empty :
   forall min max l, S min < max -> 
-    (startmin_list min (min :: l) /\ endmax_list (max - 1) (min :: l) /\ ordered_list (min :: l) )
+    (startmin_list min (min :: l) /\ endmax_list (max - 1) (min :: l) /\ Ordered_list (min :: l) )
     -> length l > 0.
   Proof.
   intros min max l Hminmax [Hst [Hend Hord]].
@@ -363,30 +365,6 @@ Lemma Sorted_list_no_empty :
     omega.
   + cbn.
     omega.
-  Qed.
-      
-(* Lemma Sorted_list_empty :
-  forall val l, 
-    (startmin_list val l /\ endmax_list val l /\ ordered_list l)
-    -> l = val :: [].
-  Proof.
-  intros val l [Hst [Hend Hord]].
-  induction l.
-  + cbn in *.
-    intuition.
-  + assert (val = a).
-    unfold startmin_list in Hst.
-    auto.
-    apply Sorted_inv in Hord. *)
-
-Lemma ordered_noempty (l : list nat) :
-  ordered_list l -> length l > 0.
-  Proof.
-  intros.
-  induction H.
-  + constructor.
-  + cbn.
-    auto.
   Qed.
 
 Lemma startmin_noempty (l : list nat) :
@@ -418,11 +396,72 @@ Lemma a_endmin_list (max: nat) (l : list nat) :
     auto.
   Qed. 
 
-Lemma a_endmax_list :
-  forall a l, ordered_list (a :: l) /\ endmax_list a (a :: l) -> l = [].
+Lemma end_in_list :
+  forall a l, endmax_list a l -> List.In a l.
   Proof.
-  
-  Admitted.
+  intros.
+  induction l.
+  cbn in H.
+  destruct H.
+  cbn in *.
+  case_eq l.
+  + intros. 
+    rewrite H0 in H.
+    left.
+    trivial.
+  + intros.
+    subst.
+    right.
+    apply IHl.
+    trivial.
+  Qed.
+
+Lemma a_endmax_list_inv :
+  forall a l, Ordered_list (a :: l) /\ endmax_list a (a :: l) ->  l = [].
+  Proof.
+  intros a l [Hord Hlen].
+  apply sortedone_to_sorted in Hord.
+  apply Sorted_extends in Hord.
+  + rewrite List.Forall_forall in Hord.
+    cbn in Hlen.
+    case_eq l;trivial.
+    intros.
+    subst.
+    apply end_in_list in Hlen.
+    generalize (Hord a).
+    intros.
+    apply H in Hlen.
+    omega.
+  + unfold Relations_1.Transitive.
+    apply lt_trans.
+  Qed.
+
+Lemma a_endmax_nth :
+  forall a l , length l > 0 -> 
+    endmax_list (a - 1) l -> forall d, List.nth (length l - 1) l d = (a - 1).
+  Proof.
+  intros.
+  induction l;intros.
+  + subst.
+    cbn in *.
+    omega.
+  + case_eq l; intros.
+    - subst.
+      cbn in H0.
+      auto.
+    - subst.
+      apply a_endmin_list in H0.
+      pose proof List.app_nth2.
+      generalize (H1 nat [a0] (n :: l0) d (length (a0 :: n :: l0) -1));intros.
+      replace (a0 :: n :: l0) with ([a0] ++ (n :: l0)) at 2.
+      assert (length (a0 :: n :: l0) - 1 - length [a0] = length (n :: l0) - 1).
+      cbn;auto.
+      rewrite H3 in H2.
+      rewrite H2.
+      apply 
+      SearchAbout List.nth.
+      (* assert ( List.nth (length (a0 :: n :: l0) - 1) (a0 :: n :: l0) d = 
+        List.nth (length (n :: l0) - 1) (a0 :: n :: l0) d *)
 
 Open Scope list_scope.
 
@@ -431,7 +470,7 @@ Open Scope list_scope.
 Lemma foreach_rule_plus (P : nat -> St -> Prop) (body : nat -> State () ):
   forall (l: list nat) (min max : nat), min < max -> 
   (forall (it : nat), {{fun s => P it s /\ (min <= it < max)}} body it {{fun _ => P (S it)}})
-  -> ordered_list l -> (startmin_list min l) /\ (endmax_list (max - 1) l) 
+  -> Ordered_list l -> (startmin_list min l) /\ (endmax_list (max - 1) l) 
      ->
     {{P min}} foreach3' l (fun it0 => loopeT_liftT (body it0)) {{fun _ => P max}} .
     Proof.
@@ -459,11 +498,10 @@ Lemma foreach_rule_plus (P : nat -> St -> Prop) (body : nat -> State () ):
         rewrite Hamin in *.
         case_eq (S min <? max); intros.
         * rewrite Nat.ltb_lt in H.
+          assert (length l > 0).
+           apply Sorted_list_no_empty with min max;auto.
           assert (startmin_list (S min) l).
           apply nextmin_ord_list; auto. 
-          apply Sorted_list_no_empty with min max;auto.
-          assert (length l > 0).
-          apply Sorted_list_no_empty with min max;auto.
           apply a_endmin_list in Hsmax; auto.
 (*           case_eq (S min <? (max - 1)).
           2 : {
@@ -485,20 +523,59 @@ Lemma foreach_rule_plus (P : nat -> St -> Prop) (body : nat -> State () ):
           assert (S min = max) by omega.
           rewrite H1.
           assert (l = []).
-          apply a_endmax_list with min;auto.
+          apply a_endmax_list_inv with min;auto.
           rewrite H2.
           intros s Hs.
           auto.
 Qed.
 
+Lemma seq_min :
+  forall min max, min < max -> 
+   startmin_list min (List.seq min (max - min)).
+   Proof.
+   intros.
+(*    assert ((max - min) > 0) by omega. *)
+   case_eq (max - min).
+   + intros.
+     omega.
+   + intros.
+     cbn.
+     trivial.
+   Qed.
+
+(* Compute List.seq 0 (5 - 0). *)
+
+Open Scope nat.
+
+Lemma seq_max :
+  forall min max, min < max -> 
+   endmax_list (max - 1) (List.seq min (max - min)).
+   Proof.
+   intros.
+   case_eq (max - min).
+   + intros. 
+     omega.
+   + intros.
+(*      pose proof List.in_seq. *)
+     pose proof List.seq_nth.
+     generalize (H1 (max - min) min (max - min - 1)).
+     intros.
+     simpl in H2.
+     (* generalize (List.in_seq min (max - min) ).
+     intros. *)
+     
+     assert (min <= max - 1 < max) by omega.
+     
+
+(* 
 Lemma foreach_rule_plus2 (P : nat -> St -> Prop) (body : nat -> State () ):
   forall (min max : nat) (l: list nat) , 
   (forall (it : nat), {{fun s => P it s /\ (min <= it < max)}} body it {{fun _ => P (S it)}})
-  -> length l > 0 -> ordered_list l -> (startmin_list min l = true) -> (endmax_list max l = true) 
+  -> length l > 0 -> Ordered_list l -> (startmin_list min l = true) -> (endmax_list max l = true) 
      ->
     {{P min}} foreach3' l (fun it0 => loopeT_liftT (body it0)) {{fun _ => P max}} .
     Proof.
-
+ *)
  
 (* Lemma foreach3_rule (min max : Z) (P : Z -> St -> Prop) (body : Z -> State ())
   : (forall (it : Z), 
