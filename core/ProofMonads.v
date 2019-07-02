@@ -438,31 +438,40 @@ Lemma a_endmax_list_inv :
 
 Lemma a_endmax_nth :
   forall a l , length l > 0 -> 
-    endmax_list (a - 1) l -> forall d, List.nth (length l - 1) l d = (a - 1).
+    endmax_list (a - 1) l <-> forall d, List.nth (length l - 1) l d = (a - 1).
   Proof.
-  intros.
-  induction l;intros.
-  + subst.
-    cbn in *.
-    omega.
-  + case_eq l; intros.
+  intros;split.
+  + induction l;intros.
     - subst.
-      cbn in H0.
-      auto.
+      cbn in *.
+      omega.
+    - case_eq l; intros.
+      * subst.
+        cbn in H0.
+        auto.
+      * subst.
+        apply a_endmin_list in H0.
+        2 : { cbn; omega.
+        }
+        pose proof List.app_nth2.
+        generalize (H1 nat [a0] (n :: l0) d (length (a0 :: n :: l0) -1));intros.
+        replace (a0 :: n :: l0) with ([a0] ++ (n :: l0)) at 2.
+        assert (length (a0 :: n :: l0) - 1 - length [a0] = length (n :: l0) - 1).
+        cbn;auto.
+        rewrite H3 in H2.
+        rewrite H2.
+        apply IHl;auto.
+        cbn; omega.
+        cbn; omega.
+        cbn; auto.
+  + induction l;intros.
     - subst.
-      apply a_endmin_list in H0.
-      pose proof List.app_nth2.
-      generalize (H1 nat [a0] (n :: l0) d (length (a0 :: n :: l0) -1));intros.
-      replace (a0 :: n :: l0) with ([a0] ++ (n :: l0)) at 2.
-      assert (length (a0 :: n :: l0) - 1 - length [a0] = length (n :: l0) - 1).
-      cbn;auto.
-      rewrite H3 in H2.
-      rewrite H2.
-      apply 
-      SearchAbout List.nth.
-      (* assert ( List.nth (length (a0 :: n :: l0) - 1) (a0 :: n :: l0) d = 
-        List.nth (length (n :: l0) - 1) (a0 :: n :: l0) d *)
-
+      cbn in *.
+      omega.
+    - admit.
+  Admitted.
+(*   Qed.
+ *)
 Open Scope list_scope.
 
 (* Open Scope nat_scope. *)
@@ -561,6 +570,7 @@ Lemma seq_max :
      generalize (H1 (max - min) min (max - min - 1)).
      intros.
      simpl in H2.
+     
      (* generalize (List.in_seq min (max - min) ).
      intros. *)
      
