@@ -46,7 +46,7 @@ Lemma LchangeElement_size1 (l : tab)  :
   forall (i n : nat), length l = length (changeElement i n l).
   Admitted.
 
-Lemma LchangeElement_size2 (l : tab)  :
+(* Lemma LchangeElement_size2 (l : tab)  :
   forall (i n : nat), length (changeElement i n l) = length l.
   Proof.
   unfold changeElement.
@@ -54,7 +54,7 @@ Lemma LchangeElement_size2 (l : tab)  :
   intros.
   - cbn.
     
-  Qed.
+  Qed. *)
 
 Lemma LchangeElement_in (i : nat) (n : nat) :
   forall (l : tab)  , i < length l -> In n (changeElement i n l).
@@ -96,7 +96,7 @@ Lemma LchangeElement_nth (i : nat) (n : nat) :
   Qed.
 
 Lemma LchangeElement_inf (i : nat) (n : nat) :
-  forall (l : tab) (j : nat) , j <= i < length l -> readTabEntry j (changeElement i n l) = readTabEntry j l.
+  forall (l : tab) (j : nat) , j < i < length l -> readTabEntry j (changeElement i n l) = readTabEntry j l.
   Admitted.
 
 Lemma LchangeElement_sup (i : nat) (n : nat) :
@@ -250,11 +250,11 @@ Lemma initPEntryI2 :
             omega.
          -- intuition.
             assert ( length (changeElement (it - 1) it s) = length s).
-            apply LchangeElement_size2.
+            symmetry.
+            apply LchangeElement_size1.
             omega.
     * rewrite Hlen1.
-      symmetry.
-      apply LchangeElement_size2.
+      apply LchangeElement_size1.
   - simpl.
     intros s [] H.
     destruct H.

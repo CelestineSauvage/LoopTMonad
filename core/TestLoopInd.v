@@ -91,7 +91,7 @@ Lemma LchangeElement_nth (i : nat) (n : nat) :
   Qed.
 
 Lemma LchangeElement_inf (i : nat) (n : nat) :
-  forall (l : tab) (j : nat) , j <= i < length l -> readTabEntry j (changeElement i n l) = readTabEntry j l.
+  forall (l : tab) (j : nat) , j < i < length l -> readTabEntry j (changeElement i n l) = readTabEntry j l.
   Admitted.
 
 Definition changeTab (i n: nat) : State tab unit :=
