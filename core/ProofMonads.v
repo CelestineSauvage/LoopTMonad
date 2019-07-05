@@ -127,9 +127,14 @@ Qed.
 Lemma strengthen (A : Type) (m : State A) (P: St -> Prop) (Q R: A -> St -> Prop) :
   {{ P }} m {{ R }} -> (forall s a, R a s -> Q a s) -> {{ P }} m {{ Q }}.
 Proof.
-intros H1 H2 s H3.
-apply H1 in H3.
-Admitted.
+intros H1 H2 s H.
+apply H1 in H.
+case_eq (m s).
+intros.
+rewrite H0 in H.
+apply H2 in H.
+assumption.
+Qed.
 
 Lemma modify f (P : () -> St -> Prop) : {{ fun s => P tt (f s) }} modify f {{ P }}.
 Proof.
@@ -150,7 +155,7 @@ Proof.
 intros s H; trivial.
 Qed.
 
-Lemma foreach_rule (min max : nat) (P : nat -> St -> Prop) (body : nat -> State () ):
+Theorem foreach_rule (min max : nat) (P : nat -> St -> Prop) (body : nat -> State () ):
   (forall (it : nat), {{fun s => P it s /\ (min < it <= max)}} body it {{fun _ => P (it - 1)}}) /\  min <= max ->
     {{P max}} M.foreach2_st max min (fun it0 => loopeT_liftT (body it0)) {{fun _ => P min}}.
     Proof.
@@ -249,7 +254,7 @@ Lemma foreach_rule_noit  (P : nat -> St -> Prop) (body : nat -> State () ):
     trivial.
     Qed.
 
-Lemma foreach_rule_plus_no_it (P : nat -> St -> Prop) (body : nat -> State () ) :
+Theorem foreach_rule_plus_no_it (P : nat -> St -> Prop) (body : nat -> State () ) :
   forall min max : nat, min >= max -> {{P max}} M.foreach3 min max 
     (fun it0 => loopeT_liftT (body it0)) {{fun _ => P max}}.
   Proof.
@@ -258,7 +263,7 @@ Lemma foreach_rule_plus_no_it (P : nat -> St -> Prop) (body : nat -> State () ) 
   intros s H; trivial.
   Qed.
 
-Lemma foreach'_rule_plus_no_it (P : nat -> St -> Prop) (body : nat -> State () ) :
+Theorem foreach'_rule_plus_no_it (P : nat -> St -> Prop) (body : nat -> State () ) :
   forall max : nat, {{P max}} M.foreach3' [] 
     (fun it0 => loopeT_liftT (body it0)) {{fun _ => P max}}.
   Proof.
@@ -320,8 +325,6 @@ Fixpoint endmax_list (max : nat) (l : list nat) : Prop :=
     | a :: [] => (a = max)
     | a :: l' => endmax_list max l'
   end.
-
-SearchAbout List.NoDup.
 
 Lemma Sorted_inv :
     forall a l, Ordered_list (a :: l) -> Ordered_list l /\ HdSel a l.
@@ -513,7 +516,6 @@ Lemma a_endmax_nth :
         cbn. omega.
         intros.
         rewrite <- H1.
-(*         pose proof List.app_nth1. *)
         pose proof List.app_nth2.
         generalize(H2 nat [a0] l d (length (a0 :: l) - 1)).
         intros.
@@ -534,7 +536,7 @@ Open Scope list_scope.
 
 (* Open Scope nat_scope. *)
 
-Lemma foreach_rule_plus_inter (P : nat -> St -> Prop) (body : nat -> State () ):
+Theorem foreach_rule_plus_inter (P : nat -> St -> Prop) (body : nat -> State () ):
   forall (l: list nat) (min max : nat), min < max -> 
   (forall (it : nat), {{fun s => P it s /\ (min <= it < max)}} body it {{fun _ => P (S it)}})
   -> Ordered_list l -> (startmin_list min l) /\ (endmax_list (max - 1) l) 
@@ -680,7 +682,7 @@ Lemma seq_ord :
         eapply H1.
   Qed.
 
-Lemma foreach_rule_plus (P : nat -> St -> Prop) (body : nat -> State () ):
+Theorem foreach_rule_plus (P : nat -> St -> Prop) (body : nat -> State () ):
   forall (min max : nat), min < max -> 
   (forall (it : nat), {{fun s => P it s /\ (min <= it < max)}} body it {{fun _ => P (S it)}})
   ->
@@ -694,6 +696,46 @@ Lemma foreach_rule_plus (P : nat -> St -> Prop) (body : nat -> State () ):
   apply seq_min;auto.
   apply seq_max;auto.
   Qed.
+
+Check bind.
+
+(* Lemma sequence_rule (A B : Type) (m : State A) (f : A -> State B) (P : St -> Prop)( Q : A -> St -> Prop) (R : B -> St -> Prop) :
+  {{ P }} m {{ Q }} -> (forall a, {{ Q a }} f a {{ R }}) -> {{ P }} perf x <- m ; f x {{ R }}. *)
+
+Definition bassn (b : State bool) : St -> Prop :=
+  fun st => (evalState b st = true).
+
+Lemma bexp_eval_true : forall b st,
+  evalState b st = true -> (bassn b) st.
+Proof.
+  intros b st Hbe.
+  unfold bassn. assumption.  Qed.
+
+Lemma bexp_eval_false : forall b st,
+  evalState b st = false -> ~ ((bassn b) st).
+Proof.
+  intros b st Hbe contra.
+  unfold bassn in contra.
+  rewrite -> contra in Hbe. inversion Hbe.  Qed.
+
+Theorem hoare_if : forall P Q b c1 c2,
+  {{fun st => P st /\ bassn b st}} c1 {{Q}} ->
+  {{fun st => P st /\ ~ (bassn b st)}} c2 {{Q}} ->
+  {{P}} TEST b THEN c1 ELSE c2 FI {{Q}}.
+
+Lemma foreach_break_rule  (P : nat -> St -> Prop) (body : nat -> State ()) (cond : nat -> State bool)
+  : forall (min max : nat), 
+     (forall (it : nat), 
+       {{fun s => (min <= it < max) /\ (cond it s = (false, s)) }}
+         body it 
+       {{fun _ s => (cond (it + 1) s = (false, s)) \/ (cond it s = (true, s)) }}) -> 
+     {{fun s => True}} foreach min max 
+       (fun it0 => 
+       (@bind bool unit (cond it0) (fun (t : bool) => 
+       if (t)
+         then break 
+         else (loopT_liftT (body it0)))))
+     {{fun _ s => True }}.
 
 (* 
 Lemma foreach_rule_plus2 (P : nat -> St -> Prop) (body : nat -> State () ):

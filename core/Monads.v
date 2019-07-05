@@ -107,8 +107,8 @@ Definition getS : State S :=
 
 Definition runState  {A} (op : State A) : S -> A * S := op.
 
-(* Definition evalState {A} (op : State A) : S -> A := fst ∘ op. *)
-(* Definition execState {A} (op : State A) : S -> S := snd ∘ op. *)
+Definition evalState {A} (op : State A) : S -> A := fst ∘ op.
+Definition execState {A} (op : State A) : S -> S := snd ∘ op.
 
 Global Program Instance stateM : Monad (State) :=
     { return_ := state_pure;
@@ -161,18 +161,12 @@ Definition loopT_pure {m e A} (a : A) : LoopT e m A :=
 Definition loopT_bind {m e A} (x : LoopT e m A) {B} (k : A -> LoopT e m B) : LoopT e m B :=
   fun _ exit cont =>
     x _ exit (fun a => k a _ exit cont).
-    
-(* Goal forall (m : Type -> Type), @loopT_bind m = @loopT_bind m.
-intros.
-unfold loopT_bind.
-unfold runLoopT.
-cbn. *)
 (* f' : continuation for the first loopT, cont : continuation for the scd loopT *)
 
 (* Monad instance *)
-(* Global Program Instance loopT_M {e m} : Monad (LoopT e m) :=
+Global Program Instance loopT_M {e m} : Monad (LoopT e m) :=
   { return_ := @loopT_pure m e;
-    bind := @loopT_bind m e}. *)
+    bind := @loopT_bind m e}.
 
 Variable m : Type -> Type.
 Variable e: Type.
@@ -383,6 +377,17 @@ Fixpoint foreach3' {m} `{Monad m} (fromto : list nat) (body : nat -> LoopeT m un
   | [] => return_ tt
   | it :: fromto' => perf out <- runLoopeT (body it); foreach3' (fromto') body
   end.
+
+Fixpoint foreach3'_ex {m} `{Monad m} (fromto : list nat) (body : nat -> LoopeT m unit) : m unit :=
+  match fromto with
+  | [] => return_ tt
+  | it :: fromto' => perf out <- runLoopeT (body it); 
+                                 match out with
+                                   | Break => return_ tt
+                                   | _ => foreach3'_ex fromto' body
+                                 end
+  end.
+
 
 Definition foreach3 (from to : nat) (body : nat -> LoopeT (State St) unit) : (State St) unit :=
   foreach3' (seq from (to - from)) body.
