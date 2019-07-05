@@ -702,8 +702,12 @@ Check bind.
 (* Lemma sequence_rule (A B : Type) (m : State A) (f : A -> State B) (P : St -> Prop)( Q : A -> St -> Prop) (R : B -> St -> Prop) :
   {{ P }} m {{ Q }} -> (forall a, {{ Q a }} f a {{ R }}) -> {{ P }} perf x <- m ; f x {{ R }}. *)
 
-Definition bassn (b : State bool) : St -> Prop :=
+(* Condition qui ne change pas l'état *)
+Definition bassn (b : State bool) :=
   fun st => (evalState b st = true).
+
+Definition condState (b : State bool) :=
+  forall P, {{ P }} b {{fun a s => P s /\ (evalState b s = a)}}.
 
 Lemma bexp_eval_true : forall b st,
   evalState b st = true -> (bassn b) st.
@@ -718,24 +722,50 @@ Proof.
   unfold bassn in contra.
   rewrite -> contra in Hbe. inversion Hbe.  Qed.
 
-Theorem hoare_if : forall P Q b c1 c2,
-  {{fun st => P st /\ bassn b st}} c1 {{Q}} ->
+Check hoareTripleS.
+
+Theorem hoare_if {A} : forall P Q b (c1 c2 : State A),
+  condState b -> {{fun st => P st /\ bassn b st}} c1 {{Q}} ->
   {{fun st => P st /\ ~ (bassn b st)}} c2 {{Q}} ->
-  {{P}} TEST b THEN c1 ELSE c2 FI {{Q}}.
+  {{P}} perf t <- b ; if (t) then c1 else c2 {{Q}}.
+  Proof.
+  intros P Q b c1 c2 cb Htrue Hfalse.
+  eapply sequence_rule.
+  + unfold condState in cb.
+    apply cb.
+  + intro a.
+    cbn.
+    case_eq a.
+    - intro.
+      eapply weaken.
+      apply Htrue.
+      intros s' [Hp Hbt].
+      split.
+      assumption.
+      apply bexp_eval_true.
+      assumption.
+    - intro.
+      eapply weaken.
+      apply Hfalse.
+      intros s' [Hp Hbt].
+      split.
+      assumption.
+      apply bexp_eval_false.
+      assumption.
+  Qed.
 
 Lemma foreach_break_rule  (P : nat -> St -> Prop) (body : nat -> State ()) (cond : nat -> State bool)
   : forall (min max : nat), 
      (forall (it : nat), 
-       {{fun s => (min <= it < max) /\ (cond it s = (false, s)) }}
+       {{fun s => (min <= it < max) /\ ~ bassn (cond it) s}}
          body it 
-       {{fun _ s => (cond (it + 1) s = (false, s)) \/ (cond it s = (true, s)) }}) -> 
-     {{fun s => True}} foreach min max 
-       (fun it0 => 
-       (@bind bool unit (cond it0) (fun (t : bool) => 
-       if (t)
-         then break 
-         else (loopT_liftT (body it0)))))
+       {{fun _ s => ~ bassn (cond (S it)) s \/ bassn (cond it) s }}) -> 
+     {{fun s => True}} foreach3 min max 
+        (fun it0 => 
+       perf t <- cond it0 ; if (t) then break else loopeT_liftT (body it0))
      {{fun _ s => True }}.
+   Proof.
+   
 
 (* 
 Lemma foreach_rule_plus2 (P : nat -> St -> Prop) (body : nat -> State () ):
