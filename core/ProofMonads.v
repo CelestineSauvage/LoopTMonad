@@ -754,18 +754,21 @@ Theorem hoare_if {A} : forall P Q b (c1 c2 : State A),
       assumption.
   Qed.
 
+(* Idée :
+    - on va forcément sortir avec le break
+    - break avec une valeur
+    *)
 Lemma foreach_break_rule  (P : nat -> St -> Prop) (body : nat -> State ()) (cond : nat -> State bool)
-  : forall (min max : nat), 
+  : forall (min max : nat), condState b -> 
      (forall (it : nat), 
-       {{fun s => (min <= it < max) /\ ~ bassn (cond it) s}}
+       {{fun s => (min <= it < max) /\ (P it s) /\ ~ bassn (cond it) s}}
          body it 
-       {{fun _ s => ~ bassn (cond (S it)) s \/ bassn (cond it) s }}) -> 
-     {{fun s => True}} foreach3 min max 
+       {{fun _ s => (P (S it) s) /\ ~ bassn (cond (S it)) s \/ bassn (cond it) s }}) -> 
+     {{fun s => P min s}} foreach3 min max 
         (fun it0 => 
        perf t <- cond it0 ; if (t) then break else loopeT_liftT (body it0))
-     {{fun _ s => True }}.
+     {{fun _ s =>  }}.
    Proof.
-   
 
 (* 
 Lemma foreach_rule_plus2 (P : nat -> St -> Prop) (body : nat -> State () ):

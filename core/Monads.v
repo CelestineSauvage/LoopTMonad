@@ -383,7 +383,7 @@ Fixpoint foreach3'_ex {m} `{Monad m} (fromto : list nat) (body : nat -> LoopeT m
   | [] => return_ tt
   | it :: fromto' => perf out <- runLoopeT (body it); 
                                  match out with
-                                   | Break => return_ tt
+                                   | Break => return_ it
                                    | _ => foreach3'_ex fromto' body
                                  end
   end.
