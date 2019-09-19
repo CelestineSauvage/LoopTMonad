@@ -24,8 +24,8 @@ Open Scope monad_scope.
 Class MonadTrans {m} `{Monad m} (t : (Type -> Type) -> (Type -> Type))  := {
   (* Lift fonction and monade transformers laws *)
   liftT : forall {A}, m A -> t m A
-(*   lifT_id : forall {A : Type} (a : A), (liftT ∘ return_) a = return_ a;
-  lifT_bind : forall A B (ma : m A) (k : A -> m B), liftT (ma >>= k) = (liftT ma) >>= (liftT ∘ k); *)
+  lifT_id : forall {A : Type} (a : A), (liftT ∘ return_) a = return_ a;
+  lifT_bind : forall A B (ma : m A) (k : A -> m B), liftT (ma >>= k) = (liftT ma) >>= (liftT ∘ k)
 }.
 
 Notation "m1 ;; m2" := (bind m1 (fun _ => m2))  (at level 60, right associativity) : monad_scope.
